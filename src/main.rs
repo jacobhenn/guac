@@ -1,90 +1,87 @@
-use std::io::Write;
+use anyhow::{Context, Error};
+use num::BigInt;
 use std::io;
-use std::error::Error;
-use termion::input::TermRead;
-use termion::event::Key::*;
+use std::io::Write;
 use termion::event::Key;
+use termion::event::Key::*;
+use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-mod real;
+mod expr;
 
-use crate::real::Real;
-use termion::{cursor, clear};
+use crate::expr::Expr;
 use termion::cursor::DetectCursorPos;
+use termion::{clear, cursor};
 // use num_traits::NumOps;
 
 const RADIX: u32 = 10;
 
 struct State<R, W: Write> {
-    stack: Vec<Real>,
+    stack: Vec<Expr>,
     input: String,
     stdin: R,
     stdout: W,
 }
 
 impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
-    fn render(&mut self) -> Result<(), std::io::Error> {
-        let (_, cy) = self.stdout.cursor_pos()?;
+    fn render(&mut self) -> Result<(), Error> {
+        let (_, cy) = self
+            .stdout
+            .cursor_pos()
+            .context("couldn't get cursor pos")?;
         print!("{}{}", clear::CurrentLine, cursor::Goto(0, cy));
         for n in &self.stack {
             print!("{} ", n);
         }
         print!("{}", self.input);
+        self.stdout.flush()?;
         Ok(())
     }
 
-    fn apply_binary(&mut self, f: fn(Real, Real) -> Real) -> Result<(), std::io::Error> {
+    fn apply_binary(&mut self, f: fn(Expr, Expr) -> Expr) -> () {
         if let Ok(x) = self.input.parse() {
-            if let Some(y) = self.stack.pop() {
-                self.stack.push(f(y, x));
+            if self.stack.len() >= 1 {
+                self.stack.push(x);
                 self.input.clear();
-                self.render()?;
             }
-        } else if self.stack.len() >= 2 {
+        }
+
+        if self.stack.len() >= 2 {
             if let (Some(x), Some(y)) = (self.stack.pop(), self.stack.pop()) {
                 self.stack.push(f(y, x));
-                self.render()?;
             }
         }
-
-        Ok(())
     }
 
-    fn apply_unary(&mut self, f: fn(Real) -> Real) -> Result<(), std::io::Error> {
+    fn apply_unary(&mut self, f: fn(Expr) -> Expr) -> () {
         if let Ok(x) = self.input.parse() {
+            self.stack.push(x);
             self.input.clear();
-            self.stack.push(f(x));
-            self.render()?;
-        } else {
+        }
+
+        if self.stack.len() >= 1 {
             if let Some(x) = self.stack.pop() {
                 self.stack.push(f(x));
-                self.render()?;
             }
         }
-
-        Ok(())
     }
 
-    fn dup(&mut self) -> Result<(), std::io::Error> {
-        if let Some(l) = self.stack.last() {
-            let l = l.clone();
+    fn dup(&mut self) -> () {
+        if let Some(l) = self.stack.pop() {
+            self.stack.push(l.clone());
             self.stack.push(l);
-            self.render()?;
         }
-        Ok(())
     }
 
-    fn swap(&mut self) -> Result<(), std::io::Error> {
+    fn swap(&mut self) -> () {
         if self.stack.len() >= 2 {
             if let (Some(x), Some(y)) = (self.stack.pop(), self.stack.pop()) {
                 self.stack.push(x);
                 self.stack.push(y);
-                self.render()?;
             }
         }
-        Ok(())
     }
 
-    fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self) -> Result<(), Error> {
         loop {
             let key = self.stdin.next().unwrap()?;
 
@@ -100,50 +97,50 @@ impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
             match key {
                 Char('q') | Esc | Ctrl('c') => break,
                 Char('\n') | Char(' ') => {
-                    let i = self.input.parse()?;
-                    self.input.clear();
-                    self.stack.push(i);
-                    print!(" ");
+                    if let Ok(i) = self.input.parse() {
+                        self.input.clear();
+                        self.stack.push(i);
+                    } else {
+                        continue;
+                    }
                 }
                 Char('d') => {
                     self.stack.pop();
-                    self.render()?;
                 }
                 Backspace => {
-                    if self.input.pop().is_some() {
-                        print!("{} {0}", cursor::Left(1));
-                    } else {
+                    if self.input.is_empty() {
                         self.stack.pop();
-                        self.render()?;
+                    } else {
+                        self.input.pop();
                     }
                 }
-                Right => self.swap()?,
-                Char('\t') => self.dup()?,
-                Char('+') => self.apply_binary(|x, y| x + y)?,
-                Char('-') => self.apply_binary(|x, y| x - y)?,
-                Char('*') => self.apply_binary(|x, y| x * y)?,
-                Char('/') => self.apply_binary(|x, y| x / y)?,
-                // Char('^') => self.apply_binary(|x, y| x.powf(y))?,
-                // Char('r') => self.apply_unary(|x| x.sqrt())?,
-                Alt('r') => self.apply_unary(|x| x * x)?,
-                // Char('|') => self.apply_unary(|x| x.abs())?,
-                // Char('s') => self.apply_unary(|x| x.sin())?,
-                // Char('c') => self.apply_unary(|x| x.cos())?,
-                // Char('t') => self.apply_unary(|x| x.tan())?,
-                // Alt('S') => self.apply_unary(|x| x.asin())?,
-                // Alt('C') => self.apply_unary(|x| x.acos())?,
-                // Alt('T') => self.apply_unary(|x| x.atan())?,
+                Right => self.swap(),
+                Char('\t') => self.dup(),
+                Char('+') => self.apply_binary(|x, y| x + y),
+                Char('-') => self.apply_binary(|x, y| x - y),
+                Char('*') => self.apply_binary(|x, y| x * y),
+                Char('/') => self.apply_binary(|x, y| x / y),
+                // Char('^') => self.apply_binary(|x, y| x.powf(y)),
+                // Char('r') => self.apply_unary(|x| x.sqrt()),
+                Alt('r') => self.apply_unary(|x| x.pow(Expr::Int(BigInt::from(2)))),
+                // Char('|') => self.apply_unary(|x| x.abs()),
+                // Char('s') => self.apply_unary(|x| x.sin()),
+                // Char('c') => self.apply_unary(|x| x.cos()),
+                // Char('t') => self.apply_unary(|x| x.tan()),
+                // Alt('S') => self.apply_unary(|x| x.asin()),
+                // Alt('C') => self.apply_unary(|x| x.acos()),
+                // Alt('T') => self.apply_unary(|x| x.atan()),
                 _ => (),
             }
 
-            self.stdout.flush()?;
+            self.render()?;
         }
 
         Ok(())
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Error> {
     let stdout = io::stdout();
     // if !stdout.is_tty() {
     //     eprintln!("stdout is not a tty!");
@@ -162,7 +159,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         stdout: stdout.into_raw_mode()?,
     };
 
-    state.start()?;
+    state.start().context("couldn't start the event loop")?;
 
     Ok(())
 }

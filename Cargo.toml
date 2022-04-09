@@ -8,4 +8,6 @@ edition = "2018"
 
 [dependencies]
 termion = "1"
+anyhow = "1"
+num = "0.4"
 # num-traits = "0.2"
