@@ -1,16 +1,18 @@
+mod expr;
+mod util;
+
+use crate::expr::Expr;
 use anyhow::{Context, Error};
 use num::BigInt;
 use std::io;
 use std::io::Write;
+use termion::cursor::DetectCursorPos;
 use termion::event::Key;
 use termion::event::Key::*;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-mod expr;
-
-use crate::expr::Expr;
-use termion::cursor::DetectCursorPos;
 use termion::{clear, cursor};
+
 // use num_traits::NumOps;
 
 const RADIX: u32 = 10;
@@ -117,12 +119,12 @@ impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
                 Right => self.swap(),
                 Char('\t') => self.dup(),
                 Char('+') => self.apply_binary(|x, y| x + y),
-                Char('-') => self.apply_binary(|x, y| x - y),
-                Char('*') => self.apply_binary(|x, y| x * y),
-                Char('/') => self.apply_binary(|x, y| x / y),
+                // Char('-') => self.apply_binary(|x, y| x - y),
+                // Char('*') => self.apply_binary(|x, y| x * y),
+                // Char('/') => self.apply_binary(|x, y| x / y),
                 // Char('^') => self.apply_binary(|x, y| x.powf(y)),
                 // Char('r') => self.apply_unary(|x| x.sqrt()),
-                Alt('r') => self.apply_unary(|x| x.pow(Expr::Int(BigInt::from(2)))),
+                // Alt('r') => self.apply_unary(|x| x.pow(Expr::Int(BigInt::from(2)))),
                 // Char('|') => self.apply_unary(|x| x.abs()),
                 // Char('s') => self.apply_unary(|x| x.sin()),
                 // Char('c') => self.apply_unary(|x| x.cos()),

@@ -1,20 +1,23 @@
-use num::{BigInt, BigRational};
+use self::add::Term;
+use num::{BigRational, One, Zero};
 use std::{
     fmt,
-    ops::{Add, Div, Mul, Sub}, str::FromStr,
+    ops::{Add, Div, Mul, Sub},
+    str::FromStr,
 };
 
-mod simplify;
+mod add;
+//mod mul;
+mod ops;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Expr {
-    Int(BigInt),
-    Ratio(BigRational),
+    Num(BigRational),
 
     // Algebraic functions
-    Sum(Vec<Expr>),
-    Product(Vec<Expr>),
-    Power(Box<Expr>, Box<Expr>),
+    Sum(Vec<Term>),
+    Product(BigRational, Vec<Expr>),
+    Power(Box<Expr>, Term),
     // Log(Box<Expr>, Box<Expr>),
 
     // // Trigonometric functions
@@ -27,10 +30,10 @@ pub enum Expr {
     // Sinh(Box<Expr>),
     // Cosh(Box<Expr>),
     // Tanh(Box<Expr>),
-    // SinhI(Box<Expr>),
-    // CoshI(Box<Expr>),
-    // TanhI(Box<Expr>),
-
+    // SinhInv(Box<Expr>),
+    // CoshInv(Box<Expr>),
+    // TanhInv(Box<Expr>),
+    Var(String),
     // // Mathematical Constants
     // /// Euler's number: 2.718281
     // E,
@@ -47,11 +50,73 @@ pub enum Expr {
     // K, // Boltzmann constant
 }
 
+impl Expr {
+    // pub fn is_composite(&self) -> bool {
+    //     match self {
+    //         Self::Int(_) | Self::Ratio(_) => false,
+    //         _ => true,
+    //     }
+    // }
+
+    // pub fn is_simply_zero(&self) -> bool {
+    //     match self {
+    //         Self::Int(n) => n.is_zero(),
+    //         Self::Ratio(n) => n.is_zero(),
+    //         _ => false,
+    //     }
+    // }
+
+    // pub fn is_num(&self) -> bool {
+    //     match self {
+    //         Self::Num(_) => true,
+    //         _ => false,
+    //     }
+    // }
+
+    pub fn correct(&mut self) {
+        match self {
+            Self::Num(_) => (),
+            Self::Sum(ts) => {
+                ts.iter_mut().for_each(|t| {
+                    for f in &mut t.facs {
+                        f.correct();
+                    }
+                });
+                ts.retain(|t| !t.coef.is_zero());
+                if ts.len() == 1 {
+                    *self = ts[0].clone().expr();
+                }
+            }
+            Self::Product(c, fs) => {
+                for i in 0..fs.len() {
+                    fs[i].correct();
+                    match &fs[i] {
+                        Self::Num(n) => {
+                            *c *= n;
+                            fs[i] = Self::Num(BigRational::one());
+                        }
+                        _ => (),
+                    }
+                }
+                fs.retain(|f| f != &Self::Num(BigRational::one()));
+
+                if fs.is_empty() {
+                    *self = Self::Num(c.clone());
+                }
+            }
+            _ => (),
+        }
+    }
+
+    // pub fn pow(self, rhs: Self) -> Self {
+    //     Self::Power(Box::new(self), Box::new(rhs))
+    // }
+}
+
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Int(n) => write!(f, "{}", n),
-            Self::Ratio(n) => write!(f, "{}", n),
+            Self::Num(n) => write!(f, "{}", n),
             Self::Sum(v) => write!(
                 f,
                 "{}",
@@ -60,80 +125,31 @@ impl fmt::Display for Expr {
                     .collect::<Vec<_>>()
                     .join("+"),
             ),
-            Self::Product(v) => write!(
+            Self::Product(c, fs) => write!(
                 f,
-                "{}",
-                v.iter()
+                "{}*{}",
+                c,
+                fs.iter()
                     .map(|n| format!("({})", n))
                     .collect::<Vec<_>>()
                     .join("*"),
             ),
             Self::Power(b, e) => write!(f, "({})^({})", b, e),
+            Self::Var(s) => write!(f, "{}", s),
         }
     }
 }
 
 impl FromStr for Expr {
-    type Err = anyhow::Error;
+    type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::Int(s.parse::<BigInt>()?))
-    }
-}
-
-impl Add for Expr {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        let mut v = Vec::new();
-        v.push(self);
-        v.push(rhs);
-        let mut raw = Self::Sum(v);
-        raw.simplify();
-        raw
-    }
-}
-
-impl Sub for Expr {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        let mut v = Vec::new();
-        v.push(rhs);
-        v.push(Self::Int(BigInt::from(-1)));
-        let addend = Self::Product(v);
-        let mut raw = self + addend;
-        raw.simplify();
-        raw
-    }
-}
-
-impl Mul for Expr {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        let mut v = Vec::new();
-        v.push(self);
-        v.push(rhs);
-        let mut raw = Self::Product(v);
-        raw.simplify();
-        raw
-    }
-}
-
-impl Div for Expr {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        let multiplicand = Self::Power(Box::new(rhs), Box::new(Self::Int(BigInt::from(-1))));
-        let mut raw = self * multiplicand;
-        raw.simplify();
-        raw
-    }
-}
-
-impl Expr {
-    pub fn pow(self, rhs: Self) -> Self {
-        Self::Power(Box::new(self), Box::new(rhs))
+        if let Ok(n) = s.parse::<BigRational>() {
+            Ok(Self::Num(n))
+        } else {
+            Ok(Self::Num(
+                BigRational::from_float(s.parse::<f64>().map_err(|_| ())?).ok_or(())?,
+            ))
+        }
     }
 }
