@@ -7,7 +7,7 @@ use std::{
 };
 
 mod add;
-//mod mul;
+mod mul;
 mod ops;
 
 #[derive(Clone, PartialEq, Eq)]
@@ -102,6 +102,16 @@ impl Expr {
 
                 if fs.is_empty() {
                     *self = Self::Num(c.clone());
+                } else if c.is_one() && fs.len() == 1 {
+                    *self = fs[0].clone();
+                }
+            }
+            Self::Power(b, e) => {
+                b.correct();
+                if e.coef.is_one() && e.facs.is_empty() {
+                    *self = *b.clone();
+                } else if e.coef.is_zero() {
+                    *self = Self::Num(BigRational::one());
                 }
             }
             _ => (),
