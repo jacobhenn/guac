@@ -31,18 +31,18 @@ impl Display for Term {
 }
 
 impl Expr {
-    pub fn terms(self) -> Vec<Term> {
+    pub fn into_term(self) -> Term {
         match self {
-            Expr::Num(coef) => vec![Term {
-                coef,
-                facs: Vec::new(),
-            }],
+            Self::Num(coef) => Term { coef, facs: Vec::new() },
+            Self::Product(coef, facs) => Term { coef, facs },
+            other => Term { coef: One::one(), facs: vec![other] },
+        }
+    }
+
+    pub fn into_terms(self) -> Vec<Term> {
+        match self {
             Expr::Sum(ts) => ts,
-            Expr::Product(coef, facs) => vec![Term { coef, facs }],
-            other => vec![Term {
-                coef: BigRational::one(),
-                facs: vec![other],
-            }],
+            other => vec![other.into_term()],
         }
     }
 }
@@ -51,8 +51,8 @@ impl Add for Expr {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let mut self_terms = self.terms();
-        'rhs: for rhs_term in rhs.terms() {
+        let mut self_terms = self.into_terms();
+        'rhs: for rhs_term in rhs.into_terms() {
             for self_term in &mut self_terms {
                 if unordered_eq(&self_term.facs, &rhs_term.facs) {
                     self_term.coef += rhs_term.coef;

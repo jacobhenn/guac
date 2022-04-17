@@ -1,6 +1,6 @@
 use super::{add::Term, Expr};
 use crate::util::unordered_eq;
-use num::{BigRational, One, traits::Pow};
+use num::{traits::Pow, BigRational, One};
 use std::ops::Mul;
 
 pub struct Factor {
@@ -17,29 +17,30 @@ impl Factor {
 }
 
 impl Expr {
-    pub fn factors(self) -> Vec<Factor> {
+    pub fn into_factor(self) -> Factor {
+        match self {
+            Self::Power(base, exp) => Factor {
+                base: *base,
+                exp: exp.into_term(),
+            },
+            base => Factor {
+                base,
+                exp: Expr::one().into_term(),
+            },
+        }
+    }
+
+    pub fn into_factors(self) -> Vec<Factor> {
         match self {
             Self::Product(c, fs) => {
-                let mut v = vec![Factor {
-                    base: Expr::Num(c),
-                    exp: Term::one(),
-                }];
+                let mut v = vec![Self::Num(c).into_factor()];
                 for f in fs {
-                    match f {
-                        Self::Power(base, exp) => v.push(Factor { base: *base, exp }),
-                        base => v.push(Factor {
-                            base,
-                            exp: Term::one(),
-                        }),
-                    }
+                    v.push(f.into_factor());
                 }
+
                 v
             }
-            Self::Power(base, exp) => vec![Factor { base: *base, exp }],
-            base => vec![Factor {
-                base,
-                exp: Term::one(),
-            }],
+            other => vec![other.into_factor()],
         }
     }
 }
@@ -48,8 +49,8 @@ impl Mul for Expr {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut self_factors = self.factors();
-        'rhs_factor: for rhs_factor in rhs.factors() {
+        let mut self_factors = self.into_factors();
+        'rhs_factor: for rhs_factor in rhs.into_factors() {
             for self_factor in &mut self_factors {
                 if self_factor.base == rhs_factor.base
                     && unordered_eq(&self_factor.exp.facs, &rhs_factor.exp.facs)

@@ -1,7 +1,6 @@
 use self::add::Term;
 use num::{
-    traits::{Inv, Pow},
-    BigRational, One, Signed, Zero,
+    BigRational, One, Zero,
 };
 use std::{
     fmt,
@@ -19,7 +18,7 @@ pub enum Expr {
     // Algebraic functions
     Sum(Vec<Term>),
     Product(BigRational, Vec<Expr>),
-    Power(Box<Expr>, Term),
+    Power(Box<Expr>, Box<Expr>),
     // Log(Box<Expr>, Box<Expr>),
 
     // // Trigonometric functions
@@ -112,10 +111,11 @@ impl Expr {
             }
             Self::Power(b, e) => {
                 b.correct();
-                if e.coef.is_one() && e.facs.is_empty() {
+                e.correct();
+                if e.is_one() {
                     *self = *b.clone();
-                } else if e.coef.is_zero() {
-                    *self = Self::Num(BigRational::one());
+                } else if e.is_zero() {
+                    *self = One::one();
                 }
             }
             _ => (),
@@ -123,44 +123,6 @@ impl Expr {
     }
 }
 
-impl Pow<Expr> for Expr {
-    type Output = Self;
-
-    fn pow(mut self, mut rhs: Self) -> Self::Output {
-        self.correct();
-        rhs.correct();
-
-        match (self, rhs) {
-            (Self::Num(b), Self::Num(e)) => {
-                if e.is_integer() {
-                    if e.is_positive() {
-                        Self::Num(b.pow(e.numer()))
-                    } else {
-                        Self::Num(b.pow(e.numer().abs()).inv())
-                    }
-                } else {
-                    let mut res = Self::Power(Box::new(Self::Num(b)), Term { coef: e, facs: vec![] });
-                    res.correct();
-                    res
-                }
-            }
-            (b, e) => {
-                let exp = match e {
-                    Self::Num(coef) => Term { coef, facs: vec![] },
-                    Self::Product(coef, facs) => Term { coef, facs },
-                    other => Term {
-                        coef: One::one(),
-                        facs: vec![other],
-                    },
-                };
-
-                let mut res = Self::Power(Box::new(b), exp);
-                res.correct();
-                res
-            }
-        }
-    }
-}
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

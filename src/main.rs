@@ -3,6 +3,7 @@ mod util;
 
 use crate::expr::Expr;
 use anyhow::{Context, Error};
+use num::traits::Pow;
 use std::io;
 use std::io::Write;
 use termion::cursor::DetectCursorPos;
@@ -121,7 +122,7 @@ impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
                 Char('-') => self.apply_binary(|x, y| x - y),
                 Char('*') => self.apply_binary(|x, y| x * y),
                 Char('/') => self.apply_binary(|x, y| x / y),
-                // Char('^') => self.apply_binary(|x, y| x.powf(y)),
+                Char('^') => self.apply_binary(|x, y| x.pow(y)),
                 // Char('r') => self.apply_unary(|x| x.sqrt()),
                 // Alt('r') => self.apply_unary(|x| x.pow(Expr::Int(BigInt::from(2)))),
                 // Char('|') => self.apply_unary(|x| x.abs()),
