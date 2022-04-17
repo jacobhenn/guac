@@ -1,5 +1,5 @@
 [package]
-name = "calculator"
+name = "guac"
 version = "0.1.0"
 authors = ["Jacob Henn <windowWeasel@outlook.com>"]
 edition = "2018"
