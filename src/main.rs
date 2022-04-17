@@ -3,7 +3,6 @@ mod util;
 
 use crate::expr::Expr;
 use anyhow::{Context, Error};
-use num::BigInt;
 use std::io;
 use std::io::Write;
 use termion::cursor::DetectCursorPos;

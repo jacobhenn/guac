@@ -1,6 +1,6 @@
 use super::{add::Term, Expr};
 use crate::util::unordered_eq;
-use num::{BigRational, One};
+use num::{BigRational, One, traits::Pow};
 use std::ops::Mul;
 
 pub struct Factor {
@@ -10,7 +10,7 @@ pub struct Factor {
 
 impl Factor {
     pub fn expr(self) -> Expr {
-        let mut expr = Expr::Power(Box::new(self.base), self.exp);
+        let mut expr = self.base.pow(self.exp.expr());
         expr.correct();
         expr
     }

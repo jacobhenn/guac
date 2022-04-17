@@ -1,8 +1,10 @@
 use self::add::Term;
-use num::{BigRational, One, Zero};
+use num::{
+    traits::{Inv, Pow},
+    BigRational, One, Signed, Zero,
+};
 use std::{
     fmt,
-    ops::{Add, Div, Mul, Sub},
     str::FromStr,
 };
 
@@ -119,11 +121,44 @@ impl Expr {
             _ => (),
         }
     }
+}
 
-    pub fn pow(self, rhs: Term) -> Self {
-        let mut res = Self::Power(Box::new(self), rhs);
-        res.correct();
-        res
+impl Pow<Expr> for Expr {
+    type Output = Self;
+
+    fn pow(mut self, mut rhs: Self) -> Self::Output {
+        self.correct();
+        rhs.correct();
+
+        match (self, rhs) {
+            (Self::Num(b), Self::Num(e)) => {
+                if e.is_integer() {
+                    if e.is_positive() {
+                        Self::Num(b.pow(e.numer()))
+                    } else {
+                        Self::Num(b.pow(e.numer().abs()).inv())
+                    }
+                } else {
+                    let mut res = Self::Power(Box::new(Self::Num(b)), Term { coef: e, facs: vec![] });
+                    res.correct();
+                    res
+                }
+            }
+            (b, e) => {
+                let exp = match e {
+                    Self::Num(coef) => Term { coef, facs: vec![] },
+                    Self::Product(coef, facs) => Term { coef, facs },
+                    other => Term {
+                        coef: One::one(),
+                        facs: vec![other],
+                    },
+                };
+
+                let mut res = Self::Power(Box::new(b), exp);
+                res.correct();
+                res
+            }
+        }
     }
 }
 

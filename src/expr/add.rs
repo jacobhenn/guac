@@ -1,6 +1,6 @@
 use super::Expr;
 use crate::util::unordered_eq;
-use num::{BigRational, One, Zero};
+use num::{BigRational, One};
 use std::{ops::Add, fmt::Display};
 
 #[derive(Clone, PartialEq, Eq)]

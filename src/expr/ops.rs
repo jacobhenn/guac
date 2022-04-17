@@ -1,7 +1,7 @@
-use num::{BigInt, BigRational, One, Zero};
+use num::{BigInt, BigRational, One, Zero, traits::Pow};
 
-use super::{Expr, add::Term};
-use std::ops::{Add, Mul, Sub, Div};
+use super::Expr;
+use std::ops::{Sub, Div};
 
 impl Zero for Expr {
     fn zero() -> Self {
@@ -47,6 +47,6 @@ impl Div for Expr {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        self * (rhs.pow(Term { coef: BigRational::from(BigInt::from(-1)), facs: vec![] }))
+        self * (rhs.pow(Self::Num(BigRational::from(BigInt::from(-1)))))
     }
 }
