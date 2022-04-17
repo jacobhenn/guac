@@ -91,14 +91,11 @@ impl Expr {
                 }
             }
             Self::Product(c, fs) => {
-                for i in 0..fs.len() {
-                    fs[i].correct();
-                    match &fs[i] {
-                        Self::Num(n) => {
-                            *c *= n;
-                            fs[i] = Self::Num(BigRational::one());
-                        }
-                        _ => (),
+                for f in fs.iter_mut() {
+                    f.correct();
+                    if let Self::Num(n) = f {
+                        *c *= n.clone();
+                        *f = Self::Num(BigRational::one());
                     }
                 }
                 fs.retain(|f| f != &Self::Num(BigRational::one()));

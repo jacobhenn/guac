@@ -39,9 +39,9 @@ impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
         Ok(())
     }
 
-    fn apply_binary(&mut self, f: fn(Expr, Expr) -> Expr) -> () {
+    fn apply_binary(&mut self, f: fn(Expr, Expr) -> Expr) {
         if let Ok(x) = self.input.parse() {
-            if self.stack.len() >= 1 {
+            if !self.stack.is_empty() {
                 self.stack.push(x);
                 self.input.clear();
             }
@@ -54,27 +54,27 @@ impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
         }
     }
 
-    fn apply_unary(&mut self, f: fn(Expr) -> Expr) -> () {
+    fn apply_unary(&mut self, f: fn(Expr) -> Expr) {
         if let Ok(x) = self.input.parse() {
             self.stack.push(x);
             self.input.clear();
         }
 
-        if self.stack.len() >= 1 {
+        if !self.stack.is_empty() {
             if let Some(x) = self.stack.pop() {
                 self.stack.push(f(x));
             }
         }
     }
 
-    fn dup(&mut self) -> () {
+    fn dup(&mut self) {
         if let Some(l) = self.stack.pop() {
             self.stack.push(l.clone());
             self.stack.push(l);
         }
     }
 
-    fn swap(&mut self) -> () {
+    fn swap(&mut self) {
         if self.stack.len() >= 2 {
             if let (Some(x), Some(y)) = (self.stack.pop(), self.stack.pop()) {
                 self.stack.push(x);
