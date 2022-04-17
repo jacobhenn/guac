@@ -35,6 +35,7 @@ impl Expr {
                 }
                 v
             }
+            Self::Power(base, exp) => vec![Factor { base: *base, exp }],
             base => vec![Factor {
                 base,
                 exp: Term::one(),
@@ -47,41 +48,38 @@ impl Mul for Expr {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut factors = Vec::new();
-        let self_factors = self.factors();
+        let mut self_factors = self.factors();
         'rhs_factor: for rhs_factor in rhs.factors() {
-            for self_factor in &self_factors {
+            for self_factor in &mut self_factors {
                 if self_factor.base == rhs_factor.base
                     && unordered_eq(&self_factor.exp.facs, &rhs_factor.exp.facs)
                 {
-                    factors.push(Factor {
-                        base: self_factor.base.clone(),
-                        exp: Term {
-                            coef: self_factor.exp.coef.clone() + rhs_factor.exp.coef.clone(),
-                            facs: self_factor.exp.facs.clone(),
-                        },
-                    });
-
-                    continue 'rhs_factor;
-                } else if self_factor.exp == rhs_factor.exp {
-                    let mut base = Self::Product(
-                        BigRational::one(),
-                        vec![self_factor.base.clone(), rhs_factor.base.clone()],
-                    );
-                    base.correct();
-                    factors.push(Factor {
-                        base,
-                        exp: self_factor.exp.clone(),
-                    });
+                    self_factor.exp.coef += rhs_factor.exp.coef;
 
                     continue 'rhs_factor;
                 }
             }
 
-            factors.push(rhs_factor);
+            for self_factor in &mut self_factors {
+                if self_factor.exp == rhs_factor.exp {
+                    let mut base = Self::Product(
+                        BigRational::one(),
+                        vec![self_factor.base.clone(), rhs_factor.base.clone()],
+                    );
+                    base.correct();
+                    self_factor.base = base;
+
+                    continue 'rhs_factor;
+                }
+            }
+
+            self_factors.push(rhs_factor);
         }
 
-        let mut product = Self::Product(BigRational::one(), factors.into_iter().map(|f| f.expr()).collect());
+        let mut product = Self::Product(
+            BigRational::one(),
+            self_factors.into_iter().map(|f| f.expr()).collect(),
+        );
         product.correct();
         product
     }

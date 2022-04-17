@@ -51,26 +51,22 @@ impl Add for Expr {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let mut terms = Vec::new();
-        let self_terms = self.terms();
+        let mut self_terms = self.terms();
         'rhs: for rhs_term in rhs.terms() {
-            for self_term in &self_terms {
+            for self_term in &mut self_terms {
                 if unordered_eq(&self_term.facs, &rhs_term.facs) {
-                    terms.push(Term {
-                        coef: self_term.coef.clone() + rhs_term.coef.clone(),
-                        facs: self_term.facs.clone(),
-                    });
+                    self_term.coef += rhs_term.coef;
                     continue 'rhs;
                 }
             }
 
-            terms.push(Term {
+            self_terms.push(Term {
                 coef: rhs_term.coef,
                 facs: rhs_term.facs,
             });
         }
 
-        let mut res = Self::Sum(terms);
+        let mut res = Self::Sum(self_terms);
         res.correct();
         res
     }

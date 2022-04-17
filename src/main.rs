@@ -119,9 +119,9 @@ impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
                 Right => self.swap(),
                 Char('\t') => self.dup(),
                 Char('+') => self.apply_binary(|x, y| x + y),
-                // Char('-') => self.apply_binary(|x, y| x - y),
+                Char('-') => self.apply_binary(|x, y| x - y),
                 Char('*') => self.apply_binary(|x, y| x * y),
-                // Char('/') => self.apply_binary(|x, y| x / y),
+                Char('/') => self.apply_binary(|x, y| x / y),
                 // Char('^') => self.apply_binary(|x, y| x.powf(y)),
                 // Char('r') => self.apply_unary(|x| x.sqrt()),
                 // Alt('r') => self.apply_unary(|x| x.pow(Expr::Int(BigInt::from(2)))),
@@ -132,6 +132,7 @@ impl<R: Iterator<Item = Result<Key, std::io::Error>>, W: Write> State<R, W> {
                 // Alt('S') => self.apply_unary(|x| x.asin()),
                 // Alt('C') => self.apply_unary(|x| x.acos()),
                 // Alt('T') => self.apply_unary(|x| x.atan()),
+                Char('x') => self.stack.push(Expr::Var("x".to_string())),
                 _ => (),
             }
 

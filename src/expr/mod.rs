@@ -85,6 +85,8 @@ impl Expr {
                 ts.retain(|t| !t.coef.is_zero());
                 if ts.len() == 1 {
                     *self = ts[0].clone().expr();
+                } else if ts.is_empty() {
+                    self.set_zero();
                 }
             }
             Self::Product(c, fs) => {
@@ -118,9 +120,11 @@ impl Expr {
         }
     }
 
-    // pub fn pow(self, rhs: Self) -> Self {
-    //     Self::Power(Box::new(self), Box::new(rhs))
-    // }
+    pub fn pow(self, rhs: Term) -> Self {
+        let mut res = Self::Power(Box::new(self), rhs);
+        res.correct();
+        res
+    }
 }
 
 impl fmt::Display for Expr {
