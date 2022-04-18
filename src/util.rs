@@ -1,4 +1,5 @@
-pub fn unordered_eq<T>(lhs: &[T], rhs: &[T]) -> bool
+/// Tell if two slices contain the same set of elements, regardless of order.
+pub fn are_unordered_eq<T>(lhs: &[T], rhs: &[T]) -> bool
 where
     T: Eq,
 {

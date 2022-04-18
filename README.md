@@ -2,6 +2,17 @@
 
 `guac` is a minimal but powerful stack-based (RPN) calculator which displays on just a few lines of the terminal.
 
+## Keybindings
+
+- `d`: **d**rop the top element of the stack
+- `q`: **q**uit
+- `x`: push **x**
+- `+`: add
+- `-`: subtract
+- `*`: multiply
+- `/`: divide
+- `^`: exponentiate
+
 ## How does the stack work?
 
 - The central interface to `guac` is the *stack*, a homogenous LIFO collection of *algebraic expressions* (numbers, variables, or functions applied to them).

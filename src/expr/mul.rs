@@ -1,22 +1,27 @@
 use super::{add::Term, Expr};
-use crate::util::unordered_eq;
+use crate::util::are_unordered_eq;
 use num::{traits::Pow, BigRational, One};
 use std::ops::Mul;
 
+/// A helper struct which represents an exponential expression meant to assist the process of product simplification.
 pub struct Factor {
+    /// The base of the factor (the `2` in `2^x`)
     pub base: Expr,
+    /// The exponent of the factor (the `x` in `2^x`)
     pub exp: Term,
 }
 
 impl Factor {
-    pub fn expr(self) -> Expr {
-        let mut expr = self.base.pow(self.exp.expr());
+    /// Convert this factor into a corrected `Expr`.
+    pub fn into_expr(self) -> Expr {
+        let mut expr = self.base.pow(self.exp.into_expr());
         expr.correct();
         expr
     }
 }
 
 impl Expr {
+    /// Convert this expression into an equivalent `Factor`. e.g., turns `2` into `2^1`.
     pub fn into_factor(self) -> Factor {
         match self {
             Self::Power(base, exp) => Factor {
@@ -30,6 +35,7 @@ impl Expr {
         }
     }
 
+    /// (Trivially) convert this expression into a list of its factors. **Does not actively factor expressions**. e.g., turns `2*x^2` into `[2^1, x^2]`, but turns `(2x+2)` into `[(2x+1)^1]`
     pub fn into_factors(self) -> Vec<Factor> {
         match self {
             Self::Product(c, fs) => {
@@ -53,7 +59,7 @@ impl Mul for Expr {
         'rhs_factor: for rhs_factor in rhs.into_factors() {
             for self_factor in &mut self_factors {
                 if self_factor.base == rhs_factor.base
-                    && unordered_eq(&self_factor.exp.facs, &rhs_factor.exp.facs)
+                    && are_unordered_eq(&self_factor.exp.facs, &rhs_factor.exp.facs)
                 {
                     self_factor.exp.coef += rhs_factor.exp.coef;
 
@@ -79,7 +85,7 @@ impl Mul for Expr {
 
         let mut product = Self::Product(
             BigRational::one(),
-            self_factors.into_iter().map(|f| f.expr()).collect(),
+            self_factors.into_iter().map(|f| f.into_expr()).collect(),
         );
         product.correct();
         product

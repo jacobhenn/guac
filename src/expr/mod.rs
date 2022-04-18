@@ -1,23 +1,33 @@
 use self::add::Term;
-use num::{
-    BigRational, One, Zero,
-};
+use num::{BigRational, One, ToPrimitive, Zero};
 use std::{
+    convert::{TryFrom, TryInto},
     fmt,
     str::FromStr,
 };
 
-mod add;
-mod mul;
-mod ops;
+/// Implementation of `Add` for `Expr`, along with helper types and functions for that purpose.
+pub mod add;
 
+/// Implementation of `Mul` for `Expr`, along with helper types and functions for that purpose.
+pub mod mul;
+
+/// Implementation of various other number traits for `Expr`, along with helper types and functions for that purpose.
+pub mod ops;
+
+/// A general-purpose type to store algebraic expressions.
 #[derive(Clone, PartialEq, Eq)]
 pub enum Expr {
+    /// A rational number.
     Num(BigRational),
 
-    // Algebraic functions
+    /// A sum of terms (pairs of rational and non-rational factors).
     Sum(Vec<Term>),
+
+    /// A product of a rational coefficient and a number of non-rational expressions. It is not inherently guaranteed that the expressions will be non-rational, but `Expr::correct` will make them so.
     Product(BigRational, Vec<Expr>),
+
+    /// One expression raised to the power of another.
     Power(Box<Expr>, Box<Expr>),
     // Log(Box<Expr>, Box<Expr>),
 
@@ -34,12 +44,14 @@ pub enum Expr {
     // SinhInv(Box<Expr>),
     // CoshInv(Box<Expr>),
     // TanhInv(Box<Expr>),
+    /// A variable.
     Var(String),
-    // // Mathematical Constants
-    // /// Euler's number: 2.718281
-    // E,
-    // /// Full circle constant: 6.283185
-    // Tau,
+
+    /// Euler's number: 2.718281.
+    E,
+
+    /// Full circle constant: 6.283185.
+    Tau,
     // /// Imaginary unit
     // I,
 
@@ -74,6 +86,12 @@ impl Expr {
     //     }
     // }
 
+    /// Returns a floating-point approximation of the real number represented by this expression.
+    pub fn to_f64(&self) -> Option<f64> {
+        self.clone().try_into().ok()
+    }
+
+    /// Performs obvious and computationally inexpensive simplifications.
     pub fn correct(&mut self) {
         match self {
             Self::Num(_) => (),
@@ -85,7 +103,7 @@ impl Expr {
                 });
                 ts.retain(|t| !t.coef.is_zero());
                 if ts.len() == 1 {
-                    *self = ts[0].clone().expr();
+                    *self = ts[0].clone().into_expr();
                 } else if ts.is_empty() {
                     self.set_zero();
                 }
@@ -120,6 +138,30 @@ impl Expr {
     }
 }
 
+impl TryFrom<Expr> for f64 {
+    type Error = ();
+
+    fn try_from(value: Expr) -> Result<Self, Self::Error> {
+        match value {
+            Expr::Num(n) => n.to_f64().ok_or(()),
+            Expr::Sum(ts) => ts
+                .into_iter()
+                .map(Term::into_expr)
+                .map(<Expr as TryInto<f64>>::try_into)
+                .sum(),
+            Expr::Product(c, fs) => c.to_f64().ok_or(()).and_then(|x| {
+                fs.into_iter()
+                    .map(<Expr as TryInto<f64>>::try_into)
+                    .product::<Result<f64, _>>()
+                    .and_then(|p| Ok(x * p))
+            }),
+            Expr::Power(b, e) => Ok(b.to_f64().ok_or(())?.powf(e.to_f64().ok_or(())?)),
+            Expr::E => Ok(std::f64::consts::E),
+            Expr::Tau => Ok(std::f64::consts::TAU),
+            _ => Err(()),
+        }
+    }
+}
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -144,6 +186,8 @@ impl fmt::Display for Expr {
             ),
             Self::Power(b, e) => write!(f, "({})^({})", b, e),
             Self::Var(s) => write!(f, "{}", s),
+            Self::E => write!(f, "e"),
+            Self::Tau => write!(f, "τ"),
         }
     }
 }

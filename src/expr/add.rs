@@ -1,21 +1,26 @@
 use super::Expr;
-use crate::util::unordered_eq;
+use crate::util::are_unordered_eq;
 use num::{BigRational, One};
 use std::{ops::Add, fmt::Display};
 
+/// A helper type to aid in the simplification of sums.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Term {
+    /// The coefficient of this term (`2` in `2*y*x^2`)
     pub coef: BigRational,
+    /// The factors of this term (`y` and `x^2` in `2*y*x^2`)
     pub facs: Vec<Expr>,
 }
 
 impl Term {
-    pub fn expr(self) -> Expr {
+    /// Convert this term into a corrected expression
+    pub fn into_expr(self) -> Expr {
         let mut res = Expr::Product(self.coef, self.facs);
         res.correct();
         res
     }
 
+    /// In lieu of the dependencies for the `num::One` trait, return the multiplicative identity of `Term`.
     pub fn one() -> Self {
         Self {
             coef: BigRational::one(),
@@ -26,11 +31,12 @@ impl Term {
 
 impl Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.clone().expr())
+        write!(f, "{}", self.clone().into_expr())
     }
 }
 
 impl Expr {
+    /// Convert this expression into a term ready to add. e.g., turns `2*y*x^2` into `Term { coef: 2, factors: [y, x^2] }`
     pub fn into_term(self) -> Term {
         match self {
             Self::Num(coef) => Term { coef, facs: Vec::new() },
@@ -39,6 +45,7 @@ impl Expr {
         }
     }
 
+    /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
     pub fn into_terms(self) -> Vec<Term> {
         match self {
             Expr::Sum(ts) => ts,
@@ -54,7 +61,7 @@ impl Add for Expr {
         let mut self_terms = self.into_terms();
         'rhs: for rhs_term in rhs.into_terms() {
             for self_term in &mut self_terms {
-                if unordered_eq(&self_term.facs, &rhs_term.facs) {
+                if are_unordered_eq(&self_term.facs, &rhs_term.facs) {
                     self_term.coef += rhs_term.coef;
                     continue 'rhs;
                 }
