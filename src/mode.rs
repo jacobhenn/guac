@@ -35,7 +35,7 @@ impl<'a> State<'a> {
             Char('*') => self.apply_binary(|x, y| x * y),
             Char('/') => self.apply_binary(|x, y| x / y),
             Char('^') => self.apply_binary(|x, y| x.pow(y)),
-            Char('l') => self.apply_unary(|x| x.log(Expr::E)),
+            // Char('l') => self.apply_unary(|x| x.log(Expr::E)),
             Char('L') => self.apply_binary(|x, y| y.log(x)),
             // Char('r') => state.apply_unary(|x| x.sqrt()),
             // Alt('r') => state.apply_unary(|x| x.pow(Expr::from(2))),
@@ -52,14 +52,14 @@ impl<'a> State<'a> {
                 approx: false,
                 expr: Expr::Var("x".to_string()),
             }),
-            Char('e') => self.stack.push(StackItem {
-                approx: false,
-                expr: Expr::E,
-            }),
-            Char('P') => self.stack.push(StackItem {
-                approx: false,
-                expr: Expr::Tau,
-            }),
+            // Char('e') => self.stack.push(StackItem {
+            //     approx: false,
+            //     expr: Expr::E,
+            // }),
+            // Char('P') => self.stack.push(StackItem {
+            //     approx: false,
+            //     expr: Expr::Tau,
+            // }),
             _ => (),
         };
 
