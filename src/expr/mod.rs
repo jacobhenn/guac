@@ -29,9 +29,11 @@ pub enum Expr {
 
     /// One expression raised to the power of another.
     Power(Box<Expr>, Box<Expr>),
-    // Log(Box<Expr>, Box<Expr>),
 
-    // // Trigonometric functions
+    /// The base-(first expression) logarithm of the second expression.
+    Log(Box<Expr>, Box<Expr>),
+
+    /// The sine of another expression.
     // Sin(Box<Expr>),
     // Cos(Box<Expr>),
     // Tan(Box<Expr>),
@@ -64,28 +66,6 @@ pub enum Expr {
 }
 
 impl Expr {
-    // pub fn is_composite(&self) -> bool {
-    //     match self {
-    //         Self::Int(_) | Self::Ratio(_) => false,
-    //         _ => true,
-    //     }
-    // }
-
-    // pub fn is_simply_zero(&self) -> bool {
-    //     match self {
-    //         Self::Int(n) => n.is_zero(),
-    //         Self::Ratio(n) => n.is_zero(),
-    //         _ => false,
-    //     }
-    // }
-
-    // pub fn is_num(&self) -> bool {
-    //     match self {
-    //         Self::Num(_) => true,
-    //         _ => false,
-    //     }
-    // }
-
     /// Returns a floating-point approximation of the real number represented by this expression.
     pub fn to_f64(&self) -> Option<f64> {
         self.clone().try_into().ok()
@@ -136,6 +116,25 @@ impl Expr {
             _ => (),
         }
     }
+
+    pub fn log(self, base: Expr) -> Expr {
+        if let Expr::Power(b, e) = self {
+            if base == *b {
+                return *e;
+            } else {
+                return *b * base.log(*e);
+            }
+        }
+
+        Expr::Log(Box::new(base), Box::new(self))
+    }
+
+    // pub fn sin(&mut self) {
+    //     if self.is_zero() {
+    //         self.set_zero();
+    //     } else if {
+    //     }
+    // }
 }
 
 impl TryFrom<Expr> for f64 {
@@ -156,6 +155,7 @@ impl TryFrom<Expr> for f64 {
                     .and_then(|p| Ok(x * p))
             }),
             Expr::Power(b, e) => Ok(b.to_f64().ok_or(())?.powf(e.to_f64().ok_or(())?)),
+            Expr::Log(b, a) => Ok(a.to_f64().ok_or(())?.log(b.to_f64().ok_or(())?)),
             Expr::E => Ok(std::f64::consts::E),
             Expr::Tau => Ok(std::f64::consts::TAU),
             _ => Err(()),
@@ -186,6 +186,7 @@ impl fmt::Display for Expr {
             ),
             Self::Power(b, e) => write!(f, "({})^({})", b, e),
             Self::Var(s) => write!(f, "{}", s),
+            Self::Log(b, a) => write!(f, "log_({})({})", b, a),
             Self::E => write!(f, "e"),
             Self::Tau => write!(f, "τ"),
         }

@@ -4,8 +4,9 @@
 
 ## Keybindings
 
-- `d`: **d**rop the top element of the stack
+- `d`: **d**rop the topmost expression
 - `q`: **q**uit
+- `` ` ``: toggle the topmost expression's display mode between approximate and exact (precision is not lost when displaying approximates)
 - `x`: push **x**
 - `+`: add
 - `-`: subtract

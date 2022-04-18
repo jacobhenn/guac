@@ -35,6 +35,8 @@ impl<'a> State<'a> {
             Char('*') => self.apply_binary(|x, y| x * y),
             Char('/') => self.apply_binary(|x, y| x / y),
             Char('^') => self.apply_binary(|x, y| x.pow(y)),
+            Char('l') => self.apply_unary(|x| x.log(Expr::E)),
+            Char('L') => self.apply_binary(|x, y| y.log(x)),
             // Char('r') => state.apply_unary(|x| x.sqrt()),
             // Alt('r') => state.apply_unary(|x| x.pow(Expr::from(2))),
             // Char('n') => state.apply_unary(|x| -x)
