@@ -6,13 +6,28 @@
 
 - `d`: **d**rop the topmost expression
 - `q`: **q**uit
-- `` ` ``: toggle the topmost expression's display mode between approximate and exact (precision is not lost when displaying approximates)
+- `` ` ``: toggle the topmost expression's display mode between exact and approximate
 - `x`: push **x**
 - `+`: add
 - `-`: subtract
 - `*`: multiply
 - `/`: divide
 - `^`: exponentiate
+- `l`: natural log
+- `L`: log with given base
+- `k`: enter constant mode
+    - `p`: pi
+    - `P`: tau
+    - `e`: e
+    - `c`: speed of light (m·s⁻¹)
+    - `G`: gravitational constant (m³·kg⁻¹·s⁻²)
+    - `h`: planck constant (J·Hz⁻¹)
+    - `H`: reduced planck constant (J·s)
+    - `k`: boltzmann constant (J·K⁻¹)
+    - `E`: elementary charge (C)
+    - `m`: mass of
+        - `e`: electron (kg)
+        - `p`: proton (kg)
 
 ## How does the stack work?
 

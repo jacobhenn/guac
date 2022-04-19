@@ -69,15 +69,25 @@ impl<'a> State<'a> {
             .cursor_pos()
             .context("couldn't get cursor pos")?;
         print!("{}{}", clear::CurrentLine, cursor::Goto(0, cy));
+
         for n in &self.stack {
             print!("{} ", n);
         }
+
         print!("{}", self.input);
         self.stdout.flush()?;
+
         Ok(())
     }
 
-    fn push(&mut self) {
+    fn push_expr(&mut self, expr: Expr) {
+        self.stack.push(StackItem {
+            approx: false,
+            expr,
+        });
+    }
+
+    fn push_input(&mut self) {
         let approx = if self.input.contains('.') {
             true
         } else {
@@ -92,7 +102,7 @@ impl<'a> State<'a> {
 
     fn apply_binary(&mut self, f: fn(Expr, Expr) -> Expr) {
         if !self.stack.is_empty() {
-            self.push();
+            self.push_input();
         }
 
         if self.stack.len() >= 2 {
@@ -106,7 +116,7 @@ impl<'a> State<'a> {
     }
 
     fn apply_unary(&mut self, f: fn(Expr) -> Expr) {
-        self.push();
+        self.push_input();
 
         if !self.stack.is_empty() {
             if let Some(x) = self.stack.pop() {
@@ -141,6 +151,7 @@ impl<'a> State<'a> {
     }
 
     fn start(&mut self) -> Result<(), Error> {
+        // self.write_modeline("normal".to_string());
         loop {
             let key = self.stdin.next().unwrap()?;
 

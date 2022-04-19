@@ -1,8 +1,12 @@
 use self::add::Term;
 use self::constant::Const;
-use num::{BigRational, One, ToPrimitive, Zero};
+use num::{
+    rational::ParseRatioError, BigInt, BigRational, FromPrimitive, Num, One, Signed, ToPrimitive,
+    Zero,
+};
 use std::{
     convert::{TryFrom, TryInto},
+    ops::{Neg, Rem},
     str::FromStr,
 };
 
@@ -119,6 +123,57 @@ impl Expr {
     // }
 }
 
+impl Neg for Expr {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::zero() - self
+    }
+}
+
+impl Rem for Expr {
+    type Output = Expr;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Num for Expr {
+    type FromStrRadixErr = ParseRatioError;
+
+    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        Ok(Self::Num(BigRational::from_str_radix(str, radix)?))
+    }
+}
+
+// impl Signed for Expr {
+//     fn abs(&self) -> Self {
+//         todo!()
+//     }
+
+//     fn abs_sub(&self, other: &Self) -> Self {
+//         todo!()
+//     }
+
+//     fn signum(&self) -> Self {
+//         match self {
+
+//             other => BigInt::from_f64(other.to_f64().unwrap().signum())
+//                 .unwrap()
+//                 .into(),
+//         }
+//     }
+
+//     fn is_positive(&self) -> bool {
+//         todo!()
+//     }
+
+//     fn is_negative(&self) -> bool {
+//         todo!()
+//     }
+// }
+
 impl TryFrom<Expr> for f64 {
     type Error = ();
 
@@ -138,10 +193,20 @@ impl TryFrom<Expr> for f64 {
             }),
             Expr::Power(b, e) => Ok(b.to_f64().ok_or(())?.powf(e.to_f64().ok_or(())?)),
             Expr::Log(b, a) => Ok(a.to_f64().ok_or(())?.log(b.to_f64().ok_or(())?)),
+            Expr::Const(c) => Ok(c.into()),
             // Expr::E => Ok(std::f64::consts::E),
             // Expr::Tau => Ok(std::f64::consts::TAU),
             _ => Err(()),
         }
+    }
+}
+
+impl<T> From<T> for Expr
+where
+    T: Into<BigRational>,
+{
+    fn from(t: T) -> Self {
+        Self::Num(t.into())
     }
 }
 
