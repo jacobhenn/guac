@@ -1,9 +1,6 @@
 use self::add::Term;
 use self::constant::Const;
-use num::{
-    rational::ParseRatioError, BigInt, BigRational, FromPrimitive, Num, One, Signed, ToPrimitive,
-    Zero,
-};
+use num::{rational::ParseRatioError, BigRational, Num, One, ToPrimitive, Zero};
 use std::{
     convert::{TryFrom, TryInto},
     ops::{Neg, Rem},

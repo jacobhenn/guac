@@ -20,7 +20,6 @@ use std::{
     ops::Deref,
 };
 use termion::cursor::DetectCursorPos;
-use termion::event::Key;
 use termion::input::{Keys, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::{clear, cursor};
@@ -57,7 +56,7 @@ impl Deref for StackItem {
 pub struct State<'a> {
     stack: Vec<StackItem>,
     input: String,
-    mode: fn(&mut State<'a>, Key) -> bool,
+    mode: fn(&mut State<'a>) -> Result<bool, Error>,
     stdin: Keys<StdinLock<'a>>,
     stdout: RawTerminal<StdoutLock<'a>>,
 }
@@ -97,6 +96,13 @@ impl<'a> State<'a> {
         if let Ok(expr) = self.input.parse() {
             self.input.clear();
             self.stack.push(StackItem { approx, expr });
+        }
+    }
+
+    fn push_var(&mut self) {
+        if !self.input.is_empty() {
+            self.stack.push(StackItem { approx: false, expr: Expr::Var(self.input.clone()) });
+            self.input.clear();
         }
     }
 
@@ -151,15 +157,22 @@ impl<'a> State<'a> {
     }
 
     fn start(&mut self) -> Result<(), Error> {
-        // self.write_modeline("normal".to_string());
-        loop {
-            let key = self.stdin.next().unwrap()?;
+        let (cx, cy) = self
+            .stdout
+            .cursor_pos()
+            .context("couldn't get cursor pos")?;
+        let (.., height) = termion::terminal_size().context("couldn't get terminal size")?;
 
-            if (self.mode)(self, key) {
+        // If the cursor is at the bottom of the screen, make room for one more line.
+        if cy == height {
+            print!("\n{}", cursor::Goto(cx, cy - 1));
+            self.stdout.flush()?;
+        }
+
+        loop {
+            if (self.mode)(self).context("couldn't tick state")? {
                 break;
             };
-
-            self.render()?;
         }
 
         Ok(())

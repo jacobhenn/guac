@@ -1,11 +1,12 @@
-use std::io::Write;
+use std::io::{self, Write};
 
 use anyhow::{Context, Result};
 use num::traits::Pow;
 use termion::{
+    clear, color,
     cursor::{self, DetectCursorPos},
-    event::Key::{self, *},
-    terminal_size, color, clear,
+    event::Key::*,
+    terminal_size,
 };
 
 use crate::{
@@ -24,8 +25,9 @@ impl<'a> State<'a> {
             .context("couldn't get cursor pos")?;
 
         print!(
-            "{}{}{}{}{}",
+            "{}{}{}{}{}{}",
             cursor::Goto(width - mode.len() as u16, cy + 1),
+            clear::CurrentLine,
             color::Fg(color::Yellow),
             mode,
             color::Fg(color::Reset),
@@ -38,8 +40,14 @@ impl<'a> State<'a> {
     }
 
     /// Process a keypress in normal mode.
-    pub fn normal(&mut self, key: Key) -> bool {
-        // self.write_modeline("normal".to_string());
+    pub fn normal(&mut self) -> Result<bool> {
+        self.write_modeline(String::new())
+            .context("couldn't write modeline")?;
+
+        let key = self.stdin.next().ok_or(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "couldn't get next key",
+        ))??;
 
         // If the key pressed was a digit in the current radix, update our
         // current input number.
@@ -50,7 +58,7 @@ impl<'a> State<'a> {
         }
 
         match key {
-            Char('q') | Esc | Ctrl('c') => return true,
+            Char('q') | Esc | Ctrl('c') => return Ok(true),
             Char('`') => self.toggle_approx(),
             Char('\n') | Char(' ') => self.push_input(),
             Char('d') => {
@@ -85,15 +93,24 @@ impl<'a> State<'a> {
             // Alt('T') => state.apply_unary(|x| x.atan()),
             Char('x') => self.push_expr(Expr::Var("x".to_string())),
             Char('k') => self.mode = Self::constant,
+            Char('v') => self.mode = Self::variable,
             _ => (),
         };
 
-        false
+        self.render().context("couldn't render")?;
+
+        Ok(false)
     }
 
     /// Constant mode: push a `Const` to the stack.
-    pub fn constant(&mut self, key: Key) -> bool {
-        // self.write_modeline("constant".to_string());
+    pub fn constant(&mut self) -> Result<bool> {
+        self.write_modeline("constant".to_string())
+            .context("couldn't write modeline")?;
+
+        let key = self.stdin.next().ok_or(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "couldn't get next key",
+        ))??;
 
         match key {
             Char('p') => self.push_expr(Expr::Const(Const::Pi)),
@@ -105,18 +122,29 @@ impl<'a> State<'a> {
             Char('H') => self.push_expr(Expr::Const(Const::Hbar)),
             Char('k') => self.push_expr(Expr::Const(Const::K)),
             Char('E') => self.push_expr(Expr::Const(Const::Qe)),
-            Char('m') => self.mode = Self::mass_constant,
+            Char('m') => {
+                self.mode = Self::mass_constant;
+                return Ok(false);
+            }
             _ => (),
-        }
+        };
 
         self.mode = Self::normal;
 
-        false
+        self.render().context("couldn't render")?;
+
+        Ok(false)
     }
 
     /// Mass constant mode: sub-mode of constant mode for physical constants which represent the mass of certain particles.
-    pub fn mass_constant(&mut self, key: Key) -> bool {
-        // self.write_modeline("mass constant".to_string());
+    pub fn mass_constant(&mut self) -> Result<bool> {
+        self.write_modeline("mass constant".to_string())
+            .context("couldn't write modeline")?;
+
+        let key = self.stdin.next().ok_or(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "couldn't get next key",
+        ))??;
 
         match key {
             Char('e') => self.push_expr(Expr::Const(Const::Me)),
@@ -126,6 +154,40 @@ impl<'a> State<'a> {
 
         self.mode = Self::normal;
 
-        false
+        self.render().context("couldn't render")?;
+
+        Ok(false)
+    }
+
+    pub fn variable(&mut self) -> Result<bool> {
+        self.write_modeline("variable".to_string())
+            .context("couldn't write modeline")?;
+
+        let key = self.stdin.next().ok_or(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "couldn't get next key",
+        ))??;
+
+        if let Char(c) = key {
+            if c.is_ascii_alphabetic() {
+                self.input.push(c);
+            }
+        }
+
+        match key {
+            Char('\n') | Char(' ') => {
+                self.push_var();
+                self.mode = Self::normal;
+            }
+            Esc => {
+                self.input.clear();
+                self.mode = Self::normal;
+            }
+            _ => (),
+        }
+
+        self.render().context("couldn't render")?;
+
+        Ok(false)
     }
 }
