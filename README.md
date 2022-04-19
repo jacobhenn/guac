@@ -15,6 +15,9 @@
 - `^`: exponentiate
 - `l`: natural log
 - `L`: log with given base
+- `v`: enter variable mode
+    - `[A-Za-z]`: type in a custom variable name
+    - `esc`: cancel
 - `k`: enter constant mode
     - `p`: pi
     - `P`: tau
@@ -28,6 +31,8 @@
     - `m`: mass of
         - `e`: electron (kg)
         - `p`: proton (kg)
+    - `esc`: cancel
+- `q`: quit
 
 ## How does the stack work?
 

@@ -16,7 +16,7 @@ use crate::{
 
 impl<'a> State<'a> {
     /// Write the given mode name on the modeline.
-    pub fn write_modeline(&mut self, mode: String) -> Result<()> {
+    pub fn write_modeline(&mut self, mut mode: String) -> Result<()> {
         let (width, ..) = terminal_size().context("couldn't get terminal size")?;
 
         let (cx, cy) = self
@@ -24,10 +24,19 @@ impl<'a> State<'a> {
             .cursor_pos()
             .context("couldn't get cursor pos")?;
 
+        let line = "q: quit".to_string();
+
+        if !mode.is_empty() {
+            mode.insert_str(0, " ");
+        }
+
         print!(
-            "{}{}{}{}{}{}",
-            cursor::Goto(width - mode.len() as u16, cy + 1),
+            "{}{}{}{}{}{}{}{}{}",
+            cursor::Goto(1 + width - (line.len() + mode.len()) as u16, cy + 1),
             clear::CurrentLine,
+            color::Fg(color::Blue),
+            line,
+            color::Fg(color::Reset),
             color::Fg(color::Yellow),
             mode,
             color::Fg(color::Reset),
@@ -126,6 +135,9 @@ impl<'a> State<'a> {
                 self.mode = Self::mass_constant;
                 return Ok(false);
             }
+            Char('q') => {
+                return Ok(true);
+            }
             _ => (),
         };
 
@@ -149,6 +161,9 @@ impl<'a> State<'a> {
         match key {
             Char('e') => self.push_expr(Expr::Const(Const::Me)),
             Char('p') => self.push_expr(Expr::Const(Const::Mp)),
+            Char('q') => {
+                return Ok(true);
+            }
             _ => (),
         }
 
@@ -159,6 +174,7 @@ impl<'a> State<'a> {
         Ok(false)
     }
 
+    /// Variable mode: allows the user to freely type in a custom variable name without triggering single-letter keybinds
     pub fn variable(&mut self) -> Result<bool> {
         self.write_modeline("variable".to_string())
             .context("couldn't write modeline")?;
@@ -178,6 +194,9 @@ impl<'a> State<'a> {
             Char('\n') | Char(' ') => {
                 self.push_var();
                 self.mode = Self::normal;
+            }
+            Backspace => {
+                self.input.pop();
             }
             Esc => {
                 self.input.clear();
