@@ -8,10 +8,9 @@ impl Expr {
     /// The grouping priority of an expression represents its position in the order of operations; higher priority means further along in the order, i.e. addition has a higher priority than exponentiation.
     pub fn grouping_priority(&self) -> u8 {
         match self {
-            Self::Var(..) | Self::Const(..) | Self::Log(..) => 0,
             Self::Num(n) => {
                 if n.is_negative() {
-                    3
+                    4
                 } else {
                     0
                 }
@@ -19,6 +18,7 @@ impl Expr {
             Self::Power(..) => 1,
             Self::Product(..) => 2,
             Self::Sum(..) => 3,
+            _ => 0,
         }
     }
 
@@ -90,7 +90,9 @@ impl Display for Expr {
             }
             Self::Var(s) => write!(f, "{}", s),
             Self::Const(c) => write!(f, "{}", c),
-            _ => todo!(),
+            Self::Mod(x, y) => write!(f, "{} mod {}", self.format_child(x), self.format_child(y)),
+            Self::Log(b, a) => write!(f, "log({})({})", b, a),
+            Self::Sin(t, m) => write!(f, "sin({} {})", t, m),
         }
     }
 }

@@ -1,7 +1,7 @@
 use super::Expr;
 use crate::util::are_unordered_eq;
 use num::{BigRational, One};
-use std::{ops::Add, fmt::Display};
+use std::{ops::{Add, AddAssign}, fmt::Display};
 
 /// A helper type to aid in the simplification of sums.
 #[derive(Clone, PartialEq, Eq)]
@@ -76,5 +76,11 @@ impl Add for Expr {
         let mut res = Self::Sum(self_terms);
         res.correct();
         res
+    }
+}
+
+impl AddAssign for Expr {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = self.clone() + rhs;
     }
 }

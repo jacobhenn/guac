@@ -10,10 +10,13 @@ pub mod expr;
 /// Various utilities
 pub mod util;
 
+mod config;
+
 mod mode;
 
 use crate::expr::Expr;
 use anyhow::{Context, Error};
+use config::Config;
 use std::{
     fmt::Display,
     io::{self, StdinLock, StdoutLock, Write},
@@ -57,6 +60,7 @@ pub struct State<'a> {
     stack: Vec<StackItem>,
     input: String,
     mode: fn(&mut State<'a>) -> Result<bool, Error>,
+    config: Config,
     stdin: Keys<StdinLock<'a>>,
     stdout: RawTerminal<StdoutLock<'a>>,
 }
@@ -67,13 +71,23 @@ impl<'a> State<'a> {
             .stdout
             .cursor_pos()
             .context("couldn't get cursor pos")?;
-        print!("{}{}", clear::CurrentLine, cursor::Goto(0, cy));
+        print!("{}{}", clear::CurrentLine, cursor::Goto(0, cy),);
 
+        let mut s = String::new();
         for n in &self.stack {
-            print!("{} ", n);
+            s.push_str(&format!("{} ", n));
         }
 
-        print!("{}", self.input);
+        s.push_str(&format!("{}", self.input));
+
+        let (width, ..) = termion::terminal_size().context("couldn't get terminal size")?;
+        let width = width - 1;
+
+        if s.len() > width as usize {
+            s.replace_range(0..s.len().saturating_sub(width as usize), "");
+        }
+
+        print!("{}", s);
         self.stdout.flush()?;
 
         Ok(())
@@ -87,26 +101,28 @@ impl<'a> State<'a> {
     }
 
     fn push_input(&mut self) {
-        let approx = if self.input.contains('.') {
-            true
-        } else {
-            false
-        };
-
         if let Ok(expr) = self.input.parse() {
             self.input.clear();
-            self.stack.push(StackItem { approx, expr });
+            self.stack.push(StackItem {
+                approx: self.input.contains('.'),
+                expr,
+            });
         }
     }
 
     fn push_var(&mut self) {
         if !self.input.is_empty() {
-            self.stack.push(StackItem { approx: false, expr: Expr::Var(self.input.clone()) });
+            self.stack.push(StackItem {
+                approx: false,
+                expr: Expr::Var(self.input.clone()),
+            });
             self.input.clear();
         }
     }
 
-    fn apply_binary(&mut self, f: fn(Expr, Expr) -> Expr) {
+    fn apply_binary<F>(&mut self, f: F)
+    where F: Fn(Expr, Expr) -> Expr,
+    {
         if !self.stack.is_empty() {
             self.push_input();
         }
@@ -121,7 +137,10 @@ impl<'a> State<'a> {
         }
     }
 
-    fn apply_unary(&mut self, f: fn(Expr) -> Expr) {
+    fn apply_unary<F>(&mut self, f: F)
+    where
+        F: Fn(Expr) -> Expr,
+    {
         self.push_input();
 
         if !self.stack.is_empty() {
@@ -190,6 +209,7 @@ fn main() -> Result<(), Error> {
         stack: Vec::new(),
         input: String::new(),
         mode: State::normal,
+        config: Config::default(),
         stdin,
         stdout,
     };

@@ -24,10 +24,10 @@ impl<'a> State<'a> {
             .cursor_pos()
             .context("couldn't get cursor pos")?;
 
-        let line = "q: quit".to_string();
+        let line = format!("(q: quit) {}", self.config.angle_measure);
 
         if !mode.is_empty() {
-            mode.insert_str(0, " ");
+            mode.insert(0, ' ');
         }
 
         print!(
@@ -53,10 +53,9 @@ impl<'a> State<'a> {
         self.write_modeline(String::new())
             .context("couldn't write modeline")?;
 
-        let key = self.stdin.next().ok_or(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "couldn't get next key",
-        ))??;
+        let key = self.stdin.next().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "couldn't get next key")
+        })??;
 
         // If the key pressed was a digit in the current radix, update our
         // current input number.
@@ -87,19 +86,23 @@ impl<'a> State<'a> {
             Char('*') => self.apply_binary(|x, y| x * y),
             Char('/') => self.apply_binary(|x, y| x / y),
             Char('^') => self.apply_binary(|x, y| x.pow(y)),
-            // Char('l') => self.apply_unary(|x| x.log(Expr::E)),
+            Char('l') => self.apply_unary(|x| x.log(Expr::Const(Const::E))),
             Char('L') => self.apply_binary(|x, y| y.log(x)),
-            // Char('r') => state.apply_unary(|x| x.sqrt()),
-            // Alt('r') => state.apply_unary(|x| x.pow(Expr::from(2))),
-            // Char('n') => state.apply_unary(|x| -x)
-            // Char('N') => state.apply_unary(|x| 1/x)
-            // Char('|') => state.apply_unary(|x| x.abs()),
-            // Char('s') => state.apply_unary(|x| x.sin()),
-            // Char('c') => state.apply_unary(|x| x.cos()),
-            // Char('t') => state.apply_unary(|x| x.tan()),
-            // Alt('S') => state.apply_unary(|x| x.asin()),
-            // Alt('C') => state.apply_unary(|x| x.acos()),
-            // Alt('T') => state.apply_unary(|x| x.atan()),
+            // Char('r') => self.apply_unary(|x| x.sqrt()),
+            // Alt('r') => self.apply_unary(|x| x.pow(Expr::from(2))),
+            // Char('n') => self.apply_unary(|x| -x)
+            // Char('N') => self.apply_unary(|x| 1/x)
+            // Char('|') => self.apply_unary(|x| x.abs()),
+            Char('s') => {
+                let angle_measure = self.config.angle_measure;
+                self.apply_unary(|x| x.generic_sin(angle_measure))
+            }
+            // Char('c') => self.apply_unary(|x| x.cos()),
+            // Char('t') => self.apply_unary(|x| x.tan()),
+            // Alt('S') => self.apply_unary(|x| x.asin()),
+            // Alt('C') => self.apply_unary(|x| x.acos()),
+            // Alt('T') => self.apply_unary(|x| x.atan()),
+            Char('%') => self.apply_binary(|x, y| x % y),
             Char('x') => self.push_expr(Expr::Var("x".to_string())),
             Char('k') => self.mode = Self::constant,
             Char('v') => self.mode = Self::variable,
@@ -116,10 +119,9 @@ impl<'a> State<'a> {
         self.write_modeline("constant".to_string())
             .context("couldn't write modeline")?;
 
-        let key = self.stdin.next().ok_or(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "couldn't get next key",
-        ))??;
+        let key = self.stdin.next().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "couldn't get next key")
+        })??;
 
         match key {
             Char('p') => self.push_expr(Expr::Const(Const::Pi)),
@@ -153,10 +155,9 @@ impl<'a> State<'a> {
         self.write_modeline("mass constant".to_string())
             .context("couldn't write modeline")?;
 
-        let key = self.stdin.next().ok_or(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "couldn't get next key",
-        ))??;
+        let key = self.stdin.next().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "couldn't get next key")
+        })??;
 
         match key {
             Char('e') => self.push_expr(Expr::Const(Const::Me)),
@@ -179,10 +180,9 @@ impl<'a> State<'a> {
         self.write_modeline("variable".to_string())
             .context("couldn't write modeline")?;
 
-        let key = self.stdin.next().ok_or(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "couldn't get next key",
-        ))??;
+        let key = self.stdin.next().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "couldn't get next key")
+        })??;
 
         if let Char(c) = key {
             if c.is_ascii_alphabetic() {

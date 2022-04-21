@@ -70,7 +70,7 @@ impl From<Const> for f64 {
             Const::Pi => consts::PI,
             Const::Tau => consts::TAU,
             Const::E => consts::E,
-            Const::Gamma => 0.57721566490153286060651209008240243104215933593992f64,
+            Const::Gamma => 0.5772156649015329f64,
             Const::Vcs => 9192631770f64,
             Const::C => 299792458f64,
             Const::H => 6.62607015e-34,

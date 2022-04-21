@@ -4,35 +4,36 @@
 
 ## Keybindings
 
-- `d`: **d**rop the topmost expression
 - `q`: **q**uit
-- `` ` ``: toggle the topmost expression's display mode between exact and approximate
-- `x`: push **x**
+- `[0-9.]`: type a number in the input
+- `[\n ]`: push the input to the stack
 - `+`: add
 - `-`: subtract
 - `*`: multiply
 - `/`: divide
 - `^`: exponentiate
-- `l`: natural log
-- `L`: log with given base
-- `v`: enter variable mode
+- `l`: natural **l**og
+- `L`: **l**og with given base
+- `d`: **d**rop the topmost expression
+- `x`: push **x**
+- `` ` ``: toggle the topmost expression's display mode between exact and approximate
+- `v`: enter **v**ariable mode
     - `[A-Za-z]`: type in a custom variable name
     - `esc`: cancel
-- `k`: enter constant mode
-    - `p`: pi
+- `k`: enter **c**onstant mode
+    - `p`: **p**i
     - `P`: tau
-    - `e`: e
+    - `e`: **e**
     - `c`: speed of light (m·s⁻¹)
-    - `G`: gravitational constant (m³·kg⁻¹·s⁻²)
+    - `G`: **g**ravitational constant (m³·kg⁻¹·s⁻²)
     - `h`: planck constant (J·Hz⁻¹)
     - `H`: reduced planck constant (J·s)
     - `k`: boltzmann constant (J·K⁻¹)
-    - `E`: elementary charge (C)
-    - `m`: mass of
-        - `e`: electron (kg)
-        - `p`: proton (kg)
+    - `E`: **e**lementary charge (C)
+    - `m`: **m**ass of
+        - `e`: **e**lectron (kg)
+        - `p`: **p**roton (kg)
     - `esc`: cancel
-- `q`: quit
 
 ## How does the stack work?
 

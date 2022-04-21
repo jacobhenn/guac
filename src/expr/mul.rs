@@ -1,9 +1,10 @@
 use super::{add::Term, Expr};
 use crate::util::are_unordered_eq;
 use num::{traits::Pow, BigRational, One};
-use std::ops::Mul;
+use std::ops::{Mul, MulAssign};
 
 /// A helper struct which represents an exponential expression meant to assist the process of product simplification.
+#[derive(PartialEq, Eq)]
 pub struct Factor {
     /// The base of the factor (the `2` in `2^x`)
     pub base: Expr,
@@ -67,18 +68,18 @@ impl Mul for Expr {
                 }
             }
 
-            for self_factor in &mut self_factors {
-                if self_factor.exp == rhs_factor.exp {
-                    let mut base = Self::Product(
-                        BigRational::one(),
-                        vec![self_factor.base.clone(), rhs_factor.base.clone()],
-                    );
-                    base.correct();
-                    self_factor.base = base;
+            // for self_factor in &mut self_factors {
+            //     if self_factor.exp == rhs_factor.exp {
+            //         let mut base = Self::Product(
+            //             BigRational::one(),
+            //             vec![self_factor.base.clone(), rhs_factor.base.clone()],
+            //         );
+            //         base.correct();
+            //         self_factor.base = base;
 
-                    continue 'rhs_factor;
-                }
-            }
+            //         continue 'rhs_factor;
+            //     }
+            // }
 
             self_factors.push(rhs_factor);
         }
@@ -89,5 +90,11 @@ impl Mul for Expr {
         );
         product.correct();
         product
+    }
+}
+
+impl MulAssign for Expr {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = self.clone() * rhs;
     }
 }

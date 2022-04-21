@@ -1,11 +1,10 @@
+use std::convert::TryInto;
+
+use crate::config::AngleMeasure;
+
 use self::add::Term;
 use self::constant::Const;
-use num::{rational::ParseRatioError, BigRational, Num, One, ToPrimitive, Zero};
-use std::{
-    convert::{TryFrom, TryInto},
-    ops::{Neg, Rem},
-    str::FromStr,
-};
+use num::{BigRational, One, Zero, BigInt};
 
 /// Implementation of `Add` for `Expr`, along with helper types and functions for that purpose.
 pub mod add;
@@ -21,6 +20,15 @@ pub mod display;
 
 /// Mathematical and physical constants.
 pub mod constant;
+
+/// Trigonometric functions.
+pub mod trig;
+
+/// Casting from expressions to other types and vice versa.
+pub mod cast;
+
+// /// Units. All of them.
+// pub mod unit;
 
 /// A general-purpose type to store algebraic expressions.
 #[derive(Clone, PartialEq, Eq)]
@@ -45,6 +53,12 @@ pub enum Expr {
 
     /// A constant (`Const`).
     Const(Const),
+
+    /// One expression modulo another.
+    Mod(Box<Expr>, Box<Expr>),
+
+    /// The sine of another expression in the given units.
+    Sin(Box<Expr>, AngleMeasure),
 }
 
 impl Expr {
@@ -78,6 +92,11 @@ impl Expr {
                         *f = Self::Num(BigRational::one());
                     }
                 }
+
+                if c.is_zero() {
+                    return *self = Self::zero();
+                }
+
                 fs.retain(|f| f != &Self::Num(BigRational::one()));
 
                 if fs.is_empty() {
@@ -99,124 +118,8 @@ impl Expr {
         }
     }
 
-    /// Take the logarithm of self in base `base`. Perform obvious simplifications.
-    pub fn log(self, base: Expr) -> Expr {
-        if let Expr::Power(b, e) = self {
-            if base == *b {
-                return *e;
-            } else {
-                return *b * base.log(*e);
-            }
-        }
-
-        Expr::Log(Box::new(base), Box::new(self))
-    }
-
-    // pub fn sin(&mut self) {
-    //     if self.is_zero() {
-    //         self.set_zero();
-    //     } else if {
-    //     }
-    // }
-}
-
-impl Neg for Expr {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self::zero() - self
+    pub fn from_int<I>(i: I) -> Self where I: Into<i128> {
+        Self::Num(BigRational::from(BigInt::from(i.into())))
     }
 }
 
-impl Rem for Expr {
-    type Output = Expr;
-
-    fn rem(self, rhs: Self) -> Self::Output {
-        todo!()
-    }
-}
-
-impl Num for Expr {
-    type FromStrRadixErr = ParseRatioError;
-
-    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        Ok(Self::Num(BigRational::from_str_radix(str, radix)?))
-    }
-}
-
-// impl Signed for Expr {
-//     fn abs(&self) -> Self {
-//         todo!()
-//     }
-
-//     fn abs_sub(&self, other: &Self) -> Self {
-//         todo!()
-//     }
-
-//     fn signum(&self) -> Self {
-//         match self {
-
-//             other => BigInt::from_f64(other.to_f64().unwrap().signum())
-//                 .unwrap()
-//                 .into(),
-//         }
-//     }
-
-//     fn is_positive(&self) -> bool {
-//         todo!()
-//     }
-
-//     fn is_negative(&self) -> bool {
-//         todo!()
-//     }
-// }
-
-impl TryFrom<Expr> for f64 {
-    type Error = ();
-
-    fn try_from(value: Expr) -> Result<Self, Self::Error> {
-        match value {
-            Expr::Num(n) => n.to_f64().ok_or(()),
-            Expr::Sum(ts) => ts
-                .into_iter()
-                .map(Term::into_expr)
-                .map(<Expr as TryInto<f64>>::try_into)
-                .sum(),
-            Expr::Product(c, fs) => c.to_f64().ok_or(()).and_then(|x| {
-                fs.into_iter()
-                    .map(<Expr as TryInto<f64>>::try_into)
-                    .product::<Result<f64, _>>()
-                    .and_then(|p| Ok(x * p))
-            }),
-            Expr::Power(b, e) => Ok(b.to_f64().ok_or(())?.powf(e.to_f64().ok_or(())?)),
-            Expr::Log(b, a) => Ok(a.to_f64().ok_or(())?.log(b.to_f64().ok_or(())?)),
-            Expr::Const(c) => Ok(c.into()),
-            // Expr::E => Ok(std::f64::consts::E),
-            // Expr::Tau => Ok(std::f64::consts::TAU),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<T> From<T> for Expr
-where
-    T: Into<BigRational>,
-{
-    fn from(t: T) -> Self {
-        Self::Num(t.into())
-    }
-}
-
-impl FromStr for Expr {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(n) = s.parse::<BigRational>() {
-            Ok(Self::Num(n))
-        } else {
-            Ok(Self::Num(
-                BigRational::from_float(s.parse::<f64>().map_err(|_| ())?).ok_or(())?,
-            ))
-        }
-    }
-}
