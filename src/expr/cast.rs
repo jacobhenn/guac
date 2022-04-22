@@ -1,4 +1,4 @@
-use super::{add::Term, constant::Const, Expr, AngleMeasure::Radian};
+use super::{constant::Const, AngleMeasure::Radian, Expr};
 use num::{BigInt, BigRational, ToPrimitive};
 use std::{
     convert::{TryFrom, TryInto},
@@ -11,17 +11,11 @@ impl TryFrom<Expr> for f64 {
     fn try_from(value: Expr) -> Result<Self, Self::Error> {
         match value {
             Expr::Num(n) => n.to_f64().ok_or(()),
-            Expr::Sum(ts) => ts
+            Expr::Sum(ts) => ts.into_iter().map(<Expr as TryInto<f64>>::try_into).sum(),
+            Expr::Product(fs) => fs
                 .into_iter()
-                .map(Term::into_expr)
                 .map(<Expr as TryInto<f64>>::try_into)
-                .sum(),
-            Expr::Product(c, fs) => c.to_f64().ok_or(()).and_then(|x| {
-                fs.into_iter()
-                    .map(<Expr as TryInto<f64>>::try_into)
-                    .product::<Result<f64, _>>()
-                    .map(|p| x * p)
-            }),
+                .product::<Result<f64, _>>(),
             Expr::Power(b, e) => Ok(b.to_f64().ok_or(())?.powf(e.to_f64().ok_or(())?)),
             Expr::Log(b, a) => Ok(a.to_f64().ok_or(())?.log(b.to_f64().ok_or(())?)),
             Expr::Const(c) => Ok(c.into()),

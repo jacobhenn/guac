@@ -3,43 +3,43 @@ use std::{fmt::{Display, self, Formatter}, f64::consts};
 /// Numerous common mathematical and physical constants.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Const {
-    /// The ratio of a circle's circumfrence to its diameter.
+    /// π ≈ 3.142: The ratio of a circle's circumfrence to its diameter.
     Pi,
 
-    /// The ratio of a circle's circumfrence to its radius.
+    /// τ ≈ 6.283: The ratio of a circle's circumfrence to its radius.
     Tau,
 
-    /// The limit of (1+1/n)^n as n approaches infinity.
+    /// e ≈ 2.718: The limit of (1+1/n)^n as n approaches infinity.
     E,
 
-    /// Euler-Mascheroni constant: The limiting difference between the harmonic series and the natural logarithm.
+    /// γ ≈ 0.577: Euler-Mascheroni constant. The limiting difference between the harmonic series and the natural logarithm.
     Gamma,
 
-    /// Hyperfine transition frequency of caesium.
+    /// ΔvCs ≈ 9.193ᴇ9 Hz: Hyperfine transition frequency of caesium.
     Vcs,
 
-    /// Speed of light.
+    /// c ≈ 2.998ᴇ8 m/s: Speed of light in vacuum.
     C,
 
-    /// Planck constant.
+    /// ℎ ≈ 6.626ᴇ-34 J/Hz: Planck constant.
     H,
 
-    /// Elementary charge.
-    Qe,
-
-    /// Boltzmann constant
-    K,
-
-    /// Reduced Planck constant.
+    /// ℏ = ℎ/τ ≈ 1.054ᴇ-34 J/Hz: Reduced Planck constant.
     Hbar,
 
-    /// Newtonian constant of gravitation.
+    /// e ≈ 1.602ᴇ-19 C: Elementary charge.
+    Qe,
+
+    /// k ≈ 1.380ᴇ-23 J/K: Boltzmann constant
+    K,
+
+    /// G ≈ 6.674ᴇ-11 m³·kg⁻¹·s⁻²: Newtonian constant of gravitation.
     G,
 
-    /// Electron mass.
+    /// mₑ ≈ 9.109ᴇ-31 kg: Electron mass.
     Me,
 
-    /// Proton mass.
+    /// m_p ≈ 1.673ᴇ-27 kg: Proton mass.
     Mp,
 }
 

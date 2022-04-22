@@ -11,11 +11,13 @@
 - `-`: subtract
 - `*`: multiply
 - `/`: divide
+- `d`: **d**rop the topmost expression
 - `^`: exponentiate
 - `l`: natural **l**og
 - `L`: **l**og with given base
-- `d`: **d**rop the topmost expression
 - `x`: push **x**
+- `%`: modulo
+- `s`: sine
 - `` ` ``: toggle the topmost expression's display mode between exact and approximate
 - `v`: enter **v**ariable mode
     - `[A-Za-z]`: type in a custom variable name

@@ -2,9 +2,8 @@ use std::convert::TryInto;
 
 use crate::config::AngleMeasure;
 
-use self::add::Term;
 use self::constant::Const;
-use num::{BigRational, One, Zero, BigInt};
+use num::{BigInt, BigRational, One, Zero};
 
 /// Implementation of `Add` for `Expr`, along with helper types and functions for that purpose.
 pub mod add;
@@ -37,10 +36,10 @@ pub enum Expr {
     Num(BigRational),
 
     /// A sum of terms (pairs of rational and non-rational factors).
-    Sum(Vec<Term>),
+    Sum(Vec<Expr>),
 
     /// A product of a rational coefficient and a number of non-rational expressions. It is not inherently guaranteed that the expressions will be non-rational, but `Expr::correct` will make them so.
-    Product(BigRational, Vec<Expr>),
+    Product(Vec<Expr>),
 
     /// One expression raised to the power of another.
     Power(Box<Expr>, Box<Expr>),
@@ -62,6 +61,17 @@ pub enum Expr {
 }
 
 impl Expr {
+    pub fn is_num(&self) -> bool {
+        matches!(self, Self::Num(..))
+    }
+
+    pub fn num(self) -> Option<BigRational> {
+        match self {
+            Self::Num(n) => Some(n),
+            _ => None,
+        }
+    }
+
     /// Returns a floating-point approximation of the real number represented by this expression.
     pub fn to_f64(&self) -> Option<f64> {
         self.clone().try_into().ok()
@@ -72,36 +82,34 @@ impl Expr {
         match self {
             Self::Num(_) => (),
             Self::Sum(ts) => {
-                ts.iter_mut().for_each(|t| {
-                    for f in &mut t.facs {
-                        f.correct();
-                    }
-                });
-                ts.retain(|t| !t.coef.is_zero());
+                for t in ts.iter_mut() {
+                    t.correct()
+                }
+                ts.retain(|t| !t.is_zero());
                 if ts.len() == 1 {
-                    *self = ts[0].clone().into_expr();
+                    *self = ts[0].clone();
                 } else if ts.is_empty() {
                     self.set_zero();
                 }
             }
-            Self::Product(c, fs) => {
+            Self::Product(fs) => {
                 for f in fs.iter_mut() {
                     f.correct();
-                    if let Self::Num(n) = f {
-                        *c *= n.clone();
-                        *f = Self::Num(BigRational::one());
-                    }
                 }
 
+                let c: BigRational = fs.into_iter().filter_map(|f| f.clone().num()).product();
+                fs.retain(|f| !f.is_num());
                 if c.is_zero() {
-                    return *self = Self::zero();
+                    return self.set_zero();
                 }
 
-                fs.retain(|f| f != &Self::Num(BigRational::one()));
+                if !c.is_one() {
+                    fs.push(Self::Num(c));
+                }
 
                 if fs.is_empty() {
-                    *self = Self::Num(c.clone());
-                } else if c.is_one() && fs.len() == 1 {
+                    self.set_one();
+                } else if fs.len() == 1 {
                     *self = fs[0].clone();
                 }
             }
@@ -118,8 +126,10 @@ impl Expr {
         }
     }
 
-    pub fn from_int<I>(i: I) -> Self where I: Into<i128> {
+    pub fn from_int<I>(i: I) -> Self
+    where
+        I: Into<i128>,
+    {
         Self::Num(BigRational::from(BigInt::from(i.into())))
     }
 }
-

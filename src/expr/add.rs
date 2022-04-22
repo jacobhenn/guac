@@ -1,76 +1,74 @@
 use super::Expr;
 use crate::util::are_unordered_eq;
 use num::{BigRational, One};
-use std::{ops::{Add, AddAssign}, fmt::Display};
-
-/// A helper type to aid in the simplification of sums.
-#[derive(Clone, PartialEq, Eq)]
-pub struct Term {
-    /// The coefficient of this term (`2` in `2*y*x^2`)
-    pub coef: BigRational,
-    /// The factors of this term (`y` and `x^2` in `2*y*x^2`)
-    pub facs: Vec<Expr>,
-}
-
-impl Term {
-    /// Convert this term into a corrected expression
-    pub fn into_expr(self) -> Expr {
-        let mut res = Expr::Product(self.coef, self.facs);
-        res.correct();
-        res
-    }
-
-    /// In lieu of the dependencies for the `num::One` trait, return the multiplicative identity of `Term`.
-    pub fn one() -> Self {
-        Self {
-            coef: BigRational::one(),
-            facs: Vec::new(),
-        }
-    }
-}
-
-impl Display for Term {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.clone().into_expr())
-    }
-}
+use std::{
+    clone::Clone,
+    fmt::Display,
+    ops::{Add, AddAssign},
+};
 
 impl Expr {
-    /// Convert this expression into a term ready to add. e.g., turns `2*y*x^2` into `Term { coef: 2, factors: [y, x^2] }`
-    pub fn into_term(self) -> Term {
+    /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
+    pub fn terms(&self) -> Vec<&Expr> {
         match self {
-            Self::Num(coef) => Term { coef, facs: Vec::new() },
-            Self::Product(coef, facs) => Term { coef, facs },
-            other => Term { coef: One::one(), facs: vec![other] },
+            Expr::Sum(ts) => ts.into_iter().collect(),
+            other => vec![other],
         }
     }
 
     /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
-    pub fn into_terms(self) -> Vec<Term> {
+    pub fn terms_mut(&mut self) -> Vec<&mut Expr> {
+        match self {
+            Expr::Sum(ts) => ts.into_iter().collect(),
+            other => vec![other],
+        }
+    }
+
+    /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
+    pub fn into_terms(self) -> Vec<Expr> {
         match self {
             Expr::Sum(ts) => ts,
-            other => vec![other.into_term()],
+            other => vec![other],
         }
+    }
+
+    pub fn is_like_term(&self, rhs: &Expr) -> bool {
+        let self_terms = self.terms();
+        rhs.factors()
+            .iter()
+            .all(|f| f.is_num() || self_terms.contains(&rhs))
+    }
+
+    pub fn coefficient(self) -> BigRational {
+        self.into_factors()
+            .into_iter()
+            .filter_map(|t| t.num())
+            .product()
+    }
+
+    pub fn combine_like_terms(self, rhs: Expr) -> Expr {
+        let mut res = Vec::new();
+        res.push(Self::Num(self.clone().coefficient() + rhs.coefficient()));
+
+        res.extend(self.into_factors().into_iter().filter(|f| !f.is_num()));
+
+        let mut prod = Self::Product(res);
+        prod.correct();
+        prod
     }
 }
 
 impl Add for Expr {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output {
+    fn add(mut self, rhs: Self) -> Self::Output {
         let mut self_terms = self.into_terms();
-        'rhs: for rhs_term in rhs.into_terms() {
-            for self_term in &mut self_terms {
-                if are_unordered_eq(&self_term.facs, &rhs_term.facs) {
-                    self_term.coef += rhs_term.coef;
-                    continue 'rhs;
-                }
+        for rhs_term in rhs.into_terms() {
+            if let Some(self_term) = self_terms.iter_mut().find(|st| st.is_like_term(&rhs_term)) {
+                *self_term = self_term.clone().combine_like_terms(rhs_term);
+            } else {
+                self_terms.push(rhs_term);
             }
-
-            self_terms.push(Term {
-                coef: rhs_term.coef,
-                facs: rhs_term.facs,
-            });
         }
 
         let mut res = Self::Sum(self_terms);
@@ -81,6 +79,6 @@ impl Add for Expr {
 
 impl AddAssign for Expr {
     fn add_assign(&mut self, rhs: Self) {
-        *self = self.clone() + rhs;
+        *self = self.clone() * rhs;
     }
 }

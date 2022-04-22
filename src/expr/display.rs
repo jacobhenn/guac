@@ -16,7 +16,7 @@ impl Expr {
                 }
             }
             Self::Power(..) => 1,
-            Self::Product(..) => 2,
+            Self::Product(..) | Self::Mod(..) => 2,
             Self::Sum(..) => 3,
             _ => 0,
         }
@@ -40,14 +40,11 @@ impl Display for Expr {
                 f,
                 "{}",
                 ts.iter()
-                    .map(|t| self.format_child(&t.clone().into_expr()))
+                    .map(|t| self.format_child(&t))
                     .collect::<Vec<_>>()
                     .join("+")
             ),
-            Self::Product(c, fs) => {
-                if !c.is_one() {
-                    write!(f, "{}·", c)?;
-                }
+            Self::Product(fs) => {
                 write!(
                     f,
                     "{}",
@@ -57,37 +54,7 @@ impl Display for Expr {
                         .join("·")
                 )
             }
-            Self::Power(b, e) => {
-                write!(f, "{}", self.format_child(b))?;
-                // match *e.clone() {
-                //     Self::Num(n) => {
-                //         if n.is_integer() {
-                //             match n.to_i8().unwrap() {
-                //                 2 => return write!(f, "²"),
-                //                 3 => return write!(f, "³"),
-                //                 4 => return write!(f, "⁴"),
-                //                 5 => return write!(f, "⁵"),
-                //                 6 => return write!(f, "⁶"),
-                //                 7 => return write!(f, "⁷"),
-                //                 8 => return write!(f, "⁸"),
-                //                 9 => return write!(f, "⁹"),
-                //                 -1 => return write!(f, "⁻¹"),
-                //                 -2 => return write!(f, "⁻²"),
-                //                 -3 => return write!(f, "⁻³"),
-                //                 -4 => return write!(f, "⁻⁴"),
-                //                 -5 => return write!(f, "⁻⁵"),
-                //                 -6 => return write!(f, "⁻⁶"),
-                //                 -7 => return write!(f, "⁻⁷"),
-                //                 -8 => return write!(f, "⁻⁸"),
-                //                 -9 => return write!(f, "⁻⁹"),
-                //                 _ => (),
-                //             };
-                //         }
-                //     },
-                //     _ => (),
-                // };
-                write!(f, "^{}", self.format_child(e))
-            }
+            Self::Power(b, e) => write!(f, "{}^{}", self.format_child(b), self.format_child(e)),
             Self::Var(s) => write!(f, "{}", s),
             Self::Const(c) => write!(f, "{}", c),
             Self::Mod(x, y) => write!(f, "{} mod {}", self.format_child(x), self.format_child(y)),

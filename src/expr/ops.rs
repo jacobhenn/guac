@@ -1,5 +1,3 @@
-use crate::expr::mul::Factor;
-
 use super::Expr;
 use num::{
     traits::{Inv, Pow},
@@ -7,7 +5,7 @@ use num::{
 };
 use std::{
     iter::{Product, Sum},
-    ops::{Div, Neg, Rem, Sub, Mul},
+    ops::{Div, Mul, Neg, Rem, Sub},
 };
 
 impl Expr {
@@ -94,9 +92,7 @@ impl Pow<Expr> for Expr {
                     res
                 }
             }
-            (Self::Product(c, fs), rhs) => Self::Num(c)
-                .pow(rhs.clone())
-                .mul(fs.into_iter().map(|f| f.pow(rhs.clone())).product()),
+            (Self::Product(fs), rhs) => fs.into_iter().map(|f| f.pow(rhs.clone())).product(),
             (Self::Power(b, e), f) => Self::Power(b, Box::new(*e * f)),
             (b, e) => {
                 let mut res = Self::Power(Box::new(b), Box::new(e));
@@ -120,7 +116,7 @@ impl Rem for Expr {
 
     fn rem(self, rhs: Self) -> Self::Output {
         if self < rhs {
-            return self
+            return self;
         }
 
         match (self, rhs) {
@@ -128,22 +124,20 @@ impl Rem for Expr {
             (lhs, rhs) => {
                 let lhs_factors = lhs.into_factors();
                 let rhs_factors = rhs.clone().into_factors();
-                let outer_factors = rhs
+                let outer_factors: Vec<Expr> = rhs
                     .into_factors()
                     .into_iter()
-                    .filter(|rf| lhs_factors.contains(rf));
-                let outer: Vec<_> = outer_factors.map(Factor::into_expr).collect();
+                    .filter(|rf| lhs_factors.contains(rf))
+                    .collect();
                 let left: Expr = lhs_factors
                     .into_iter()
-                    .map(Factor::into_expr)
-                    .filter(|e| !outer.contains(e))
+                    .filter(|e| !outer_factors.contains(e))
                     .product();
                 let right: Expr = rhs_factors
                     .into_iter()
-                    .map(Factor::into_expr)
-                    .filter(|e| !outer.contains(e))
+                    .filter(|e| !outer_factors.contains(e))
                     .product();
-                outer.into_iter().product::<Expr>()
+                outer_factors.into_iter().product::<Expr>()
                     * match (left, right) {
                         (Self::Num(n), Self::Num(m)) => Self::Num(n % m),
                         (left, right) => Self::Mod(Box::new(left), Box::new(right)),
