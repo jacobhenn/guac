@@ -1,5 +1,9 @@
 use super::Expr;
-use num::{BigInt, BigRational, One, Zero, traits::{Pow, Inv}, Signed, Num, rational::ParseRatioError};
+use num::{
+    rational::ParseRatioError,
+    traits::{Inv, Pow},
+    BigInt, BigRational, Num, One, Signed, Zero,
+};
 use std::{
     iter::{Product, Sum},
     ops::{Div, Neg, Rem, Sub},
@@ -80,24 +84,21 @@ impl Pow<Expr> for Expr {
         self.correct();
         rhs.correct();
 
-        match (self, rhs) {
+        let mut res = match (self, rhs) {
             (Self::Num(b), Self::Num(e)) => {
                 if e.is_integer() {
                     Self::Num(b.pow(e.numer()))
                 } else {
-                    let mut res = Self::Power(Box::new(Self::Num(b)), Box::new(Self::Num(e)));
-                    res.correct();
-                    res
+                    Self::Power(Box::new(Self::Num(b)), Box::new(Self::Num(e)))
                 }
             }
             (Self::Product(fs), rhs) => fs.into_iter().map(|f| f.pow(rhs.clone())).product(),
             (Self::Power(b, e), f) => Self::Power(b, Box::new(*e * f)),
-            (b, e) => {
-                let mut res = Self::Power(Box::new(b), Box::new(e));
-                res.correct();
-                res
-            }
-        }
+            (b, e) => Self::Power(Box::new(b), Box::new(e)),
+        };
+
+        res.correct();
+        res
     }
 }
 

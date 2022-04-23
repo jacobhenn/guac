@@ -66,6 +66,11 @@ impl Expr {
         matches!(self, Self::Num(..))
     }
 
+    /// Is this expression a Mod variant?
+    pub fn is_mod(&self) -> bool {
+        matches!(self, Self::Mod(..))
+    }
+
     /// Return the contents of this expression if it's a Num; if not, return None.
     pub fn num(self) -> Option<BigRational> {
         match self {

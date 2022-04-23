@@ -1,6 +1,9 @@
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Neg,
+};
 
-use num::Signed;
+use num::{traits::Inv, One, Signed};
 
 use super::Expr;
 
@@ -16,7 +19,7 @@ impl Expr {
                 }
             }
             Self::Power(..) => 1,
-            Self::Product(..) | Self::Mod(..) => 2,
+            Self::Product(..) => 2,
             Self::Sum(..) => 3,
             _ => 0,
         }
@@ -24,10 +27,37 @@ impl Expr {
 
     /// Use the grouping priority of `self` and `child` to decide wether or not to surround `child` in parens, then format it.
     pub fn format_child(&self, child: &Expr) -> String {
-        if child.grouping_priority() > self.grouping_priority() {
+        if child.grouping_priority() > self.grouping_priority() || child.is_mod() {
             format!("({})", child)
         } else {
             format!("{}", child)
+        }
+    }
+
+    pub fn product_safe_format(&self, child: &Expr) -> String {
+        match child {
+            Self::Product(v) => {
+                let str = format!(
+                    "{}",
+                    v.iter()
+                        .map(|t| self.format_child(&t))
+                        .collect::<Vec<_>>()
+                        .join("·")
+                );
+                if child.grouping_priority() > self.grouping_priority() {
+                    format!("({})", str)
+                } else {
+                    format!("{}", str)
+                }
+            }
+            other => self.format_child(other),
+        }
+    }
+
+    pub fn has_pos_exp(&self) -> bool {
+        match self {
+            Self::Num(n) => !n.numer().is_one(),
+            other => other.exponent().is_positive(),
         }
     }
 }
@@ -49,20 +79,27 @@ impl Display for Expr {
                 )?;
 
                 for n in neg {
-                    write!(f, "-{}", self.format_child(&n))?
+                    write!(f, "-{}", self.format_child(&n.clone().neg()))?
                 }
 
                 Ok(())
             }
             Self::Product(fs) => {
-                write!(
-                    f,
-                    "{}",
-                    fs.iter()
-                        .map(|f| self.format_child(&f))
-                        .collect::<Vec<_>>()
-                        .join("·")
-                )
+                let (numer_vec, denom_vec): (Vec<&Expr>, Vec<&Expr>) =
+                    fs.into_iter().partition(|f| f.has_pos_exp());
+
+                let mut numer = Self::Product(numer_vec.into_iter().map(Clone::clone).collect());
+                let mut denom =
+                    Self::Product(denom_vec.into_iter().map(|f| f.clone().inv()).collect());
+                numer.correct();
+                denom.correct();
+
+                write!(f, "{}", self.product_safe_format(&numer))?;
+                if !denom.is_one() {
+                    write!(f, "/{}", self.product_safe_format(&denom))?;
+                }
+
+                Ok(())
             }
             Self::Power(b, e) => write!(f, "{}^{}", self.format_child(b), self.format_child(e)),
             Self::Var(s) => write!(f, "{}", s),
