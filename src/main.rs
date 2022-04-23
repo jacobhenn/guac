@@ -58,6 +58,7 @@ pub struct State<'a> {
     stack: Vec<StackItem>,
     input: String,
     eex_input: String,
+    err: String,
     mode: fn(&mut State<'a>) -> Result<bool, Error>,
     config: Config,
     stdin: Keys<StdinLock<'a>>,
@@ -204,6 +205,8 @@ impl<'a> State<'a> {
             };
         }
 
+        println!();
+
         Ok(())
     }
 }
@@ -219,6 +222,7 @@ fn main() -> Result<(), Error> {
         stack: Vec::new(),
         input: String::new(),
         eex_input: String::new(),
+        err: String::new(),
         mode: State::normal,
         config: Config::default(),
         stdin,

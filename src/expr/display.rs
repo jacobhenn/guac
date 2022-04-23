@@ -116,6 +116,8 @@ impl Display for Expr {
             Self::Mod(x, y) => write!(f, "{} mod {}", self.format_child(x), self.format_child(y)),
             Self::Log(b, a) => write!(f, "log({})({})", b, a),
             Self::Sin(t, m) => write!(f, "sin({} {})", t, m),
+            Self::Cos(t, m) => write!(f, "cos({} {})", t, m),
+            Self::Tan(t, m) => write!(f, "tan({} {})", t, m),
         }
     }
 }

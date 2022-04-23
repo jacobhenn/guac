@@ -58,6 +58,12 @@ pub enum Expr {
 
     /// The sine of another expression in the given units.
     Sin(Box<Expr>, AngleMeasure),
+
+    /// The cosine of another expression in the given units.
+    Cos(Box<Expr>, AngleMeasure),
+
+    /// The tangent of another expression in the given units.
+    Tan(Box<Expr>, AngleMeasure),
 }
 
 impl Expr {

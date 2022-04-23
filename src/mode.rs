@@ -3,7 +3,10 @@ use crate::{
     StackItem, State, RADIX,
 };
 use anyhow::{Context, Result};
-use num::traits::{Inv, Pow, Zero};
+use num::{
+    traits::{Inv, Pow, Zero},
+    BigInt, Signed,
+};
 use std::{
     io::{self, Write},
     ops::Neg,
@@ -32,9 +35,15 @@ impl<'a> State<'a> {
         }
 
         print!(
-            "{}{}{}{}{}{}{}{}{}",
-            cursor::Goto(1 + width - (line.len() + mode.len()) as u16, cy + 1),
+            "{}{}{}{}{} {}{}{}{}{}{}{}",
+            cursor::Goto(
+                1 + width - (1 + self.err.chars().count() + line.len() + mode.len()) as u16,
+                cy + 1
+            ),
             clear::CurrentLine,
+            color::Fg(color::Red),
+            self.err,
+            color::Fg(color::Reset),
             color::Fg(color::Blue),
             line,
             color::Fg(color::Reset),
@@ -53,6 +62,7 @@ impl<'a> State<'a> {
     pub fn normal(&mut self) -> Result<bool> {
         self.write_modeline(String::new())
             .context("couldn't write modeline")?;
+        self.err.clear();
 
         let key = self.stdin.next().ok_or_else(|| {
             io::Error::new(io::ErrorKind::UnexpectedEof, "couldn't get next key")
@@ -86,31 +96,37 @@ impl<'a> State<'a> {
             Char('-') => self.apply_binary(|x, y| x - y),
             Char('*') => self.apply_binary(|x, y| x * y),
             Char('/') => {
-                if let Ok(n) = self.input.parse::<i128>() {
+                if let Ok(n) = self.input.parse::<BigInt>() {
                     if !n.is_zero() {
                         self.apply_binary(|x, y| x / y)
+                    } else {
+                        self.err = "divide by zero".to_string();
                     }
                 } else if let Some(StackItem { expr, .. }) = self.stack.last() {
                     if !expr.is_zero() {
                         self.apply_binary(|x, y| x / y)
+                    } else {
+                        self.err = "divide by zero".to_string();
                     }
                 }
             }
             Char('^') => {
-                if let Ok(n) = self.input.parse::<i128>() {
+                if let Ok(n) = self.input.parse::<BigInt>() {
                     if n.is_negative() {
                         if let Some(StackItem { expr, .. }) = self.stack.last() {
-                            if !expr.is_zero() {
+                            if expr.is_zero() {
+                                self.err = "divide by zero".to_string();
+                            } else {
                                 self.apply_binary(|x, y| x.pow(y))
                             }
                         }
                     } else {
                         self.apply_binary(|x, y| x.pow(y))
                     }
+                } else if self.stack[self.stack.len() - 2].expr.is_zero() {
+                    self.err = "divide by zero".to_string();
                 } else {
-                    if !self.stack[self.stack.len() - 2].expr.is_zero() {
-                        self.apply_binary(|x, y| x.pow(y))
-                    }
+                    self.apply_binary(|x, y| x.pow(y))
                 }
             }
             Char('l') => self.apply_unary(|x| x.log(Expr::Const(Const::E))),
@@ -120,14 +136,30 @@ impl<'a> State<'a> {
             Char('R') => self.apply_unary(|x| x.pow(2.into())),
             Char('`') => self.apply_unary(|x| x.inv()),
             Char('~') => self.apply_unary(|x| x.neg()),
-            // Char('r') => self.apply_unary(|x| x.sqrt()),
-            // Alt('r') => self.apply_unary(|x| x.pow(Expr::from(2))),
-            // Char('n') => self.apply_unary(|x| -x)
-            // Char('N') => self.apply_unary(|x| 1/x)
-            // Char('|') => self.apply_unary(|x| x.abs()),
+            Char('|') => self.apply_unary(|x| x.abs()),
             Char('s') => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(|x| x.generic_sin(angle_measure))
+            }
+            Char('c') => {
+                let angle_measure = self.config.angle_measure;
+                self.apply_unary(|x| x.generic_cos(angle_measure))
+            }
+            Char('t') => {
+                let angle_measure = self.config.angle_measure;
+                if let Ok(n) = self.input.parse::<Expr>() {
+                    if n.into_turns(angle_measure) % (1, 2).into() != (1, 4).into() {
+                        self.apply_unary(|x| x.generic_tan(angle_measure))
+                    } else {
+                        self.err = "tangent of π/2".to_string();
+                    }
+                } else if let Some(n) = self.stack.last() {
+                    if n.expr.clone().into_turns(angle_measure) % (1, 2).into() != (1, 4).into() {
+                        self.apply_unary(|x| x.generic_tan(angle_measure))
+                    } else {
+                        self.err = "tangent of π/2".to_string();
+                    }
+                }
             }
             // Char('c') => self.apply_unary(|x| x.cos()),
             // Char('t') => self.apply_unary(|x| x.tan()),

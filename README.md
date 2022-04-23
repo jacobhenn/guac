@@ -5,7 +5,7 @@
 ## Keybindings
 
 - `q`: **q**uit
-- `[0-9.eE]`: type a number in the input (`e` for e-notation, `E` to type `e-`)
+- `[eE.0-9]`: type a number in the input (`e` for e-notation, `E` to type `e-`)
 - `[\n ]`: push the input to the stack
 - `+`: add
 - `-`: subtract
@@ -19,10 +19,12 @@
 - `L`: **l**og with given base
 - `r`: square **r**oot
 - `R`: square
-- `x`: push **x**
 - `%`: modulo
-- `s`: **s**ine
 - `;`: toggle the topmost expression's display mode between exact and approximate
+- `s`: **s**ine
+- `c`: **c**osine
+- `t`: **t**angent
+- `x`: push **x**
 - `v`: enter **v**ariable mode
     - `[A-Za-z]`: type in a custom variable name
     - `esc`: cancel
