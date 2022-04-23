@@ -102,7 +102,15 @@ impl Display for Expr {
 
                 Ok(())
             }
-            Self::Power(b, e) => write!(f, "{}^{}", self.format_child(b), self.format_child(e)),
+            Self::Power(b, e) => {
+                if **e == (1, 2).into() {
+                    write!(f, "sqrt({})", b)
+                } else if **e == (1, 3).into() {
+                    write!(f, "cbrt({})", b)
+                } else {
+                    write!(f, "{}^{}", self.format_child(b), self.format_child(e))
+                }
+            }
             Self::Var(s) => write!(f, "{}", s),
             Self::Const(c) => write!(f, "{}", c),
             Self::Mod(x, y) => write!(f, "{} mod {}", self.format_child(x), self.format_child(y)),

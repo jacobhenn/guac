@@ -116,6 +116,8 @@ impl<'a> State<'a> {
             Char('l') => self.apply_unary(|x| x.log(Expr::Const(Const::E))),
             Char('L') => self.apply_binary(|x, y| y.log(x)),
             Char('%') => self.apply_binary(|x, y| x % y),
+            Char('r') => self.apply_unary(|x| x.sqrt()),
+            Char('R') => self.apply_unary(|x| x.pow(2.into())),
             Char('`') => self.apply_unary(|x| x.inv()),
             Char('~') => self.apply_unary(|x| x.neg()),
             // Char('r') => self.apply_unary(|x| x.sqrt()),

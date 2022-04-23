@@ -17,9 +17,11 @@
 - `^`: exponentiate
 - `l`: natural **l**og
 - `L`: **l**og with given base
+- `r`: square **r**oot
+- `R`: square
 - `x`: push **x**
 - `%`: modulo
-- `s`: sine
+- `s`: **s**ine
 - `;`: toggle the topmost expression's display mode between exact and approximate
 - `v`: enter **v**ariable mode
     - `[A-Za-z]`: type in a custom variable name
