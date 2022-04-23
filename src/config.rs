@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::fmt::{Display, Formatter, self};
 
 use termion::event::Key;

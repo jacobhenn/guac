@@ -1,11 +1,8 @@
 use super::Expr;
-use num::{
-    traits::{Inv, Pow},
-    BigInt, BigRational, One, Signed, Zero,
-};
+use num::{BigInt, BigRational, One, Zero, traits::{Pow, Inv}, Signed, Num, rational::ParseRatioError};
 use std::{
     iter::{Product, Sum},
-    ops::{Div, Mul, Neg, Rem, Sub},
+    ops::{Div, Neg, Rem, Sub},
 };
 
 impl Expr {
@@ -22,6 +19,7 @@ impl Expr {
         Expr::Log(Box::new(base), Box::new(self))
     }
 
+    /// Take the square root of this expression.
     pub fn sqrt(self) -> Expr {
         self.pow((1, 2).into())
     }
@@ -111,6 +109,14 @@ impl Neg for Expr {
     }
 }
 
+impl Inv for Expr {
+    type Output = Self;
+
+    fn inv(self) -> Self::Output {
+        self.pow((-1).into())
+    }
+}
+
 impl Rem for Expr {
     type Output = Expr;
 
@@ -165,37 +171,45 @@ impl PartialOrd for Expr {
     }
 }
 
-// impl Num for Expr {
-//     type FromStrRadixErr = ParseRatioError;
+impl Num for Expr {
+    type FromStrRadixErr = ParseRatioError;
 
-//     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-//         Ok(Self::Num(BigRational::from_str_radix(str, radix)?))
-//     }
-// }
+    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        Ok(Self::Num(BigRational::from_str_radix(str, radix)?))
+    }
+}
 
-// impl Signed for Expr {
-//     fn abs(&self) -> Self {
-//         todo!()
-//     }
+impl Signed for Expr {
+    fn abs(&self) -> Self {
+        if self.is_negative() {
+            self.clone().neg()
+        } else {
+            self.clone()
+        }
+    }
 
-//     fn abs_sub(&self, other: &Self) -> Self {
-//         todo!()
-//     }
+    fn abs_sub(&self, other: &Self) -> Self {
+        if self <= other {
+            Self::zero()
+        } else {
+            self.clone() - other.clone()
+        }
+    }
 
-//     fn signum(&self) -> Self {
-//         match self {
+    fn signum(&self) -> Self {
+        if self.is_negative() {
+            Self::one().neg()
+        } else {
+            Self::one()
+        }
+    }
 
-//             other => BigInt::from_f64(other.to_f64().unwrap().signum())
-//                 .unwrap()
-//                 .into(),
-//         }
-//     }
+    fn is_positive(&self) -> bool {
+        // TODO: i really shouldn't have to clone here. fix things.
+        self.clone().coefficient().is_positive()
+    }
 
-//     fn is_positive(&self) -> bool {
-//         todo!()
-//     }
-
-//     fn is_negative(&self) -> bool {
-//         todo!()
-//     }
-// }
+    fn is_negative(&self) -> bool {
+        !self.is_positive()
+    }
+}

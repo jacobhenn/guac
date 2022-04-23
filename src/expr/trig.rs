@@ -1,6 +1,6 @@
 use std::{convert::TryInto, ops::Neg};
 
-use num::{One, Zero, BigInt, traits::Pow};
+use num::{One, Zero};
 
 use crate::config::AngleMeasure;
 
@@ -28,14 +28,17 @@ impl AngleMeasure {
 }
 
 impl Expr {
+    /// Interpret the given expression as an angle in `measure`, and convert it to an angle in turns.
     pub fn into_turns(self, measure: AngleMeasure) -> Expr {
         self / measure.full_turn()
     }
 
+    /// Convert this expression from one angle measure into another.
     pub fn convert_angle(self, old_measure: AngleMeasure, new_measure: AngleMeasure) -> Expr {
         self.into_turns(old_measure) * new_measure.full_turn()
     }
 
+    /// Take the sine of this expression as an angle in `measure`.
     pub fn generic_sin(self, measure: AngleMeasure) -> Expr {
         let turns = self.clone().into_turns(measure) % Expr::one();
         if turns >= (1, 2).into() {
@@ -53,7 +56,7 @@ impl Expr {
                 (Ok(1), Ok(12)) => (1, 2).into(),
                 _ => Self::Sin(Box::new(self), measure),
             },
-            turns => Self::Sin(Box::new(self), measure),
+            _ => Self::Sin(Box::new(self), measure),
         }
     }
 }

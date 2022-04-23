@@ -1,13 +1,12 @@
 use super::Expr;
-use crate::util::are_unordered_eq;
-use num::{traits::Pow, BigRational, One};
+use num::{traits::Pow, One};
 use std::ops::{Mul, MulAssign};
 
 impl Expr {
     /// (Trivially) convert this expression into a list of its factors. **Does not actively factor expressions**. e.g., turns `2*x^2` into `[2, x^2]`, but turns `(2x+2)` into `[2x+2]`
     pub fn factors(&self) -> Vec<&Expr> {
         match self {
-            Self::Product(fs) => fs.into_iter().collect(),
+            Self::Product(fs) => fs.iter().collect(),
             other => vec![other],
         }
     }
@@ -15,7 +14,7 @@ impl Expr {
     /// (Trivially) convert this expression into a list of its factors. **Does not actively factor expressions**. e.g., turns `2*x^2` into `[2, x^2]`, but turns `(2x+2)` into `[2x+2]`
     pub fn factors_mut(&mut self) -> Vec<&mut Expr> {
         match self {
-            Self::Product(fs) => fs.into_iter().collect(),
+            Self::Product(fs) => fs.iter_mut().collect(),
             other => vec![other],
         }
     }
@@ -28,6 +27,7 @@ impl Expr {
         }
     }
 
+    /// Return the base of this expression. e.g., x^2 -> x, x+5 -> x+5
     pub fn base(&self) -> Self {
         match self {
             Self::Power(b, ..) => *b.clone(),
@@ -35,6 +35,7 @@ impl Expr {
         }
     }
 
+    /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
     pub fn exponent(&self) -> Self {
         match self {
             Self::Power(_, e) => *e.clone(),
@@ -42,6 +43,7 @@ impl Expr {
         }
     }
 
+    /// Do these two terms have the same base and like terms for exponents?
     pub fn is_like_factor(&self, rhs: &Self) -> bool {
         self.base() == rhs.base() && self.exponent().is_like_term(&rhs.exponent())
     }
@@ -50,7 +52,13 @@ impl Expr {
 impl Mul for Expr {
     type Output = Self;
 
-    fn mul(mut self, rhs: Self) -> Self::Output {
+    fn mul(self, rhs: Self) -> Self::Output {
+        if let Self::Sum(ts) = self {
+            return ts.into_iter().map(|t| t * rhs.clone()).sum();
+        } else if let Self::Sum(ts) = rhs {
+            return ts.into_iter().map(|t| t * self.clone()).sum();
+        }
+
         let mut self_factors = self.into_factors();
         for rhs_factor in rhs.into_factors() {
             if let Some(self_factor) = self_factors

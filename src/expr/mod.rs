@@ -61,10 +61,12 @@ pub enum Expr {
 }
 
 impl Expr {
+    /// Is this expression a Num variant?
     pub fn is_num(&self) -> bool {
         matches!(self, Self::Num(..))
     }
 
+    /// Return the contents of this expression if it's a Num; if not, return None.
     pub fn num(self) -> Option<BigRational> {
         match self {
             Self::Num(n) => Some(n),
@@ -97,7 +99,7 @@ impl Expr {
                     f.correct();
                 }
 
-                let c: BigRational = fs.into_iter().filter_map(|f| f.clone().num()).product();
+                let c: BigRational = fs.iter_mut().filter_map(|f| f.clone().num()).product();
                 fs.retain(|f| !f.is_num());
                 if c.is_zero() {
                     return self.set_zero();
@@ -126,6 +128,7 @@ impl Expr {
         }
     }
 
+    /// If something can be an integer, it can be an Expr.
     pub fn from_int<I>(i: I) -> Self
     where
         I: Into<i128>,

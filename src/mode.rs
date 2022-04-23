@@ -1,17 +1,15 @@
-use std::io::{self, Write};
-
+use crate::{
+    expr::{constant::Const, Expr},
+    State, RADIX,
+};
 use anyhow::{Context, Result};
-use num::traits::Pow;
+use num::traits::{Pow, Inv};
+use std::{io::{self, Write}, ops::Neg};
 use termion::{
     clear, color,
     cursor::{self, DetectCursorPos},
     event::Key::*,
     terminal_size,
-};
-
-use crate::{
-    expr::{constant::Const, Expr},
-    State, RADIX,
 };
 
 impl<'a> State<'a> {
@@ -67,7 +65,7 @@ impl<'a> State<'a> {
 
         match key {
             Char('q') | Esc | Ctrl('c') => return Ok(true),
-            Char('`') => self.toggle_approx(),
+            Char(';') => self.toggle_approx(),
             Char('\n') | Char(' ') => self.push_input(),
             Char('d') => {
                 self.stack.pop();
@@ -88,6 +86,9 @@ impl<'a> State<'a> {
             Char('^') => self.apply_binary(|x, y| x.pow(y)),
             Char('l') => self.apply_unary(|x| x.log(Expr::Const(Const::E))),
             Char('L') => self.apply_binary(|x, y| y.log(x)),
+            Char('%') => self.apply_binary(|x, y| x % y),
+            Char('`') => self.apply_unary(|x| x.inv()),
+            Char('~') => self.apply_unary(|x| x.neg()),
             // Char('r') => self.apply_unary(|x| x.sqrt()),
             // Alt('r') => self.apply_unary(|x| x.pow(Expr::from(2))),
             // Char('n') => self.apply_unary(|x| -x)
@@ -102,7 +103,6 @@ impl<'a> State<'a> {
             // Alt('S') => self.apply_unary(|x| x.asin()),
             // Alt('C') => self.apply_unary(|x| x.acos()),
             // Alt('T') => self.apply_unary(|x| x.atan()),
-            Char('%') => self.apply_binary(|x, y| x % y),
             Char('x') => self.push_expr(Expr::Var("x".to_string())),
             Char('k') => self.mode = Self::constant,
             Char('v') => self.mode = Self::variable,

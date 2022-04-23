@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use num::{One, Signed};
+use num::Signed;
 
 use super::Expr;
 
@@ -36,14 +36,24 @@ impl Display for Expr {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Self::Num(n) => write!(f, "{}", n),
-            Self::Sum(ts) => write!(
-                f,
-                "{}",
-                ts.iter()
-                    .map(|t| self.format_child(&t))
-                    .collect::<Vec<_>>()
-                    .join("+")
-            ),
+            Self::Sum(ts) => {
+                let (pos, neg): (Vec<&Expr>, Vec<&Expr>) = ts.iter().partition(|t| t.is_positive());
+
+                write!(
+                    f,
+                    "{}",
+                    pos.iter()
+                        .map(|t| self.format_child(&t))
+                        .collect::<Vec<_>>()
+                        .join("+")
+                )?;
+
+                for n in neg {
+                    write!(f, "-{}", self.format_child(&n))?
+                }
+
+                Ok(())
+            }
             Self::Product(fs) => {
                 write!(
                     f,

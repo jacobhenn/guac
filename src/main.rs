@@ -7,9 +7,6 @@
 /// Provides the `Expr` type and various methods for working with it
 pub mod expr;
 
-/// Various utilities
-pub mod util;
-
 mod config;
 
 mod mode;
@@ -78,7 +75,7 @@ impl<'a> State<'a> {
             s.push_str(&format!("{} ", n));
         }
 
-        s.push_str(&format!("{}", self.input));
+        s.push_str(&self.input.to_string());
 
         let (width, ..) = termion::terminal_size().context("couldn't get terminal size")?;
         let width = width - 1;
