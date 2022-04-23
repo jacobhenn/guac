@@ -1,9 +1,9 @@
 use crate::{
     expr::{constant::Const, Expr},
-    State, RADIX,
+    StackItem, State, RADIX,
 };
 use anyhow::{Context, Result};
-use num::traits::{Inv, Pow};
+use num::traits::{Inv, Pow, Zero};
 use std::{
     io::{self, Write},
     ops::Neg,
@@ -85,8 +85,34 @@ impl<'a> State<'a> {
             Char('+') => self.apply_binary(|x, y| x + y),
             Char('-') => self.apply_binary(|x, y| x - y),
             Char('*') => self.apply_binary(|x, y| x * y),
-            Char('/') => self.apply_binary(|x, y| x / y),
-            Char('^') => self.apply_binary(|x, y| x.pow(y)),
+            Char('/') => {
+                if let Ok(n) = self.input.parse::<i128>() {
+                    if !n.is_zero() {
+                        self.apply_binary(|x, y| x / y)
+                    }
+                } else if let Some(StackItem { expr, .. }) = self.stack.last() {
+                    if !expr.is_zero() {
+                        self.apply_binary(|x, y| x / y)
+                    }
+                }
+            }
+            Char('^') => {
+                if let Ok(n) = self.input.parse::<i128>() {
+                    if n.is_negative() {
+                        if let Some(StackItem { expr, .. }) = self.stack.last() {
+                            if !expr.is_zero() {
+                                self.apply_binary(|x, y| x.pow(y))
+                            }
+                        }
+                    } else {
+                        self.apply_binary(|x, y| x.pow(y))
+                    }
+                } else {
+                    if !self.stack[self.stack.len() - 2].expr.is_zero() {
+                        self.apply_binary(|x, y| x.pow(y))
+                    }
+                }
+            }
             Char('l') => self.apply_unary(|x| x.log(Expr::Const(Const::E))),
             Char('L') => self.apply_binary(|x, y| y.log(x)),
             Char('%') => self.apply_binary(|x, y| x % y),
