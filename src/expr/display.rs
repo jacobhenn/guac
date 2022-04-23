@@ -34,26 +34,27 @@ impl Expr {
         }
     }
 
+    /// Format this expression, but don't try to split products into a numerator and denominator.
     pub fn product_safe_format(&self, child: &Expr) -> String {
         match child {
             Self::Product(v) => {
-                let str = format!(
-                    "{}",
-                    v.iter()
-                        .map(|t| self.format_child(&t))
-                        .collect::<Vec<_>>()
-                        .join("·")
-                );
+                let str = v
+                    .iter()
+                    .map(|t| self.format_child(&t))
+                    .collect::<Vec<_>>()
+                    .join("·");
+
                 if child.grouping_priority() > self.grouping_priority() {
                     format!("({})", str)
                 } else {
-                    format!("{}", str)
+                    str
                 }
             }
             other => self.format_child(other),
         }
     }
 
+    /// Does this expression have a negative exponent? Will also return true for fractions with a numerator of 1.
     pub fn has_pos_exp(&self) -> bool {
         match self {
             Self::Num(n) => !n.numer().is_one(),
@@ -86,7 +87,7 @@ impl Display for Expr {
             }
             Self::Product(fs) => {
                 let (numer_vec, denom_vec): (Vec<&Expr>, Vec<&Expr>) =
-                    fs.into_iter().partition(|f| f.has_pos_exp());
+                    fs.iter().partition(|f| f.has_pos_exp());
 
                 let mut numer = Self::Product(numer_vec.into_iter().map(Clone::clone).collect());
                 let mut denom =

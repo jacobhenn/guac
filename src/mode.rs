@@ -3,8 +3,11 @@ use crate::{
     State, RADIX,
 };
 use anyhow::{Context, Result};
-use num::traits::{Pow, Inv};
-use std::{io::{self, Write}, ops::Neg};
+use num::traits::{Inv, Pow};
+use std::{
+    io::{self, Write},
+    ops::Neg,
+};
 use termion::{
     clear, color,
     cursor::{self, DetectCursorPos},
@@ -58,13 +61,13 @@ impl<'a> State<'a> {
         // If the key pressed was a digit in the current radix, update our
         // current input number.
         if let Char(c) = key {
-            if c.is_digit(RADIX) || c == '.' {
+            if c.is_digit(RADIX) || c == '.' || c == 'e' {
                 self.input.push(c);
             }
         }
 
         match key {
-            Char('q') | Esc | Ctrl('c') => return Ok(true),
+            Char('q') | Esc => return Ok(true),
             Char(';') => self.toggle_approx(),
             Char('\n') | Char(' ') => self.push_input(),
             Char('d') => {
@@ -104,6 +107,9 @@ impl<'a> State<'a> {
             // Alt('C') => self.apply_unary(|x| x.acos()),
             // Alt('T') => self.apply_unary(|x| x.atan()),
             Char('x') => self.push_expr(Expr::Var("x".to_string())),
+            Char('E') => {
+                self.input.push_str("e-");
+            }
             Char('k') => self.mode = Self::constant,
             Char('v') => self.mode = Self::variable,
             _ => (),

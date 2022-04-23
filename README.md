@@ -5,12 +5,14 @@
 ## Keybindings
 
 - `q`: **q**uit
-- `[0-9.]`: type a number in the input
+- `[0-9.eE]`: type a number in the input (`e` for e-notation, `E` to type `e-`)
 - `[\n ]`: push the input to the stack
 - `+`: add
 - `-`: subtract
 - `*`: multiply
 - `/`: divide
+- `` ` ``: reciprocal
+- `~`: opposite (by analogy to Vim's `~`)
 - `d`: **d**rop the topmost expression
 - `^`: exponentiate
 - `l`: natural **l**og
@@ -18,7 +20,7 @@
 - `x`: push **x**
 - `%`: modulo
 - `s`: sine
-- `` ` ``: toggle the topmost expression's display mode between exact and approximate
+- `;`: toggle the topmost expression's display mode between exact and approximate
 - `v`: enter **v**ariable mode
     - `[A-Za-z]`: type in a custom variable name
     - `esc`: cancel

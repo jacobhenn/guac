@@ -14,6 +14,7 @@ mod mode;
 use crate::expr::Expr;
 use anyhow::{Context, Error};
 use config::Config;
+use num::traits::Pow;
 use std::{
     fmt::Display,
     io::{self, StdinLock, StdoutLock, Write},
@@ -56,6 +57,7 @@ impl Deref for StackItem {
 pub struct State<'a> {
     stack: Vec<StackItem>,
     input: String,
+    eex_input: String,
     mode: fn(&mut State<'a>) -> Result<bool, Error>,
     config: Config,
     stdin: Keys<StdinLock<'a>>,
@@ -98,12 +100,22 @@ impl<'a> State<'a> {
     }
 
     fn push_input(&mut self) {
-        if let Ok(expr) = self.input.parse() {
-            self.input.clear();
-            self.stack.push(StackItem {
-                approx: self.input.contains('.'),
-                expr,
-            });
+        let input = self.input.parse::<Expr>();
+        if let Ok(expr) = input {
+            if let Ok(eex) = self.eex_input.parse::<i128>() {
+                self.input.clear();
+                self.eex_input.clear();
+                self.stack.push(StackItem {
+                    approx: self.input.contains('.') || eex.is_negative(),
+                    expr: expr * Expr::from_int(RADIX).pow(eex.into()),
+                });
+            } else {
+                self.input.clear();
+                self.stack.push(StackItem {
+                    approx: self.input.contains('.'),
+                    expr,
+                });
+            }
         }
     }
 
@@ -118,7 +130,8 @@ impl<'a> State<'a> {
     }
 
     fn apply_binary<F>(&mut self, f: F)
-    where F: Fn(Expr, Expr) -> Expr,
+    where
+        F: Fn(Expr, Expr) -> Expr,
     {
         if !self.stack.is_empty() {
             self.push_input();
@@ -205,6 +218,7 @@ fn main() -> Result<(), Error> {
     let mut state = State {
         stack: Vec::new(),
         input: String::new(),
+        eex_input: String::new(),
         mode: State::normal,
         config: Config::default(),
         stdin,
