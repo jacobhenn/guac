@@ -7,31 +7,31 @@ use std::{
 
 impl Expr {
     /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
-    pub fn terms(&self) -> Vec<&Expr> {
+    pub fn terms(&self) -> Vec<&Self> {
         match self {
-            Expr::Sum(ts) => ts.iter().collect(),
+            Self::Sum(ts) => ts.iter().collect(),
             other => vec![other],
         }
     }
 
     /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
-    pub fn terms_mut(&mut self) -> Vec<&mut Expr> {
+    pub fn terms_mut(&mut self) -> Vec<&mut Self> {
         match self {
-            Expr::Sum(ts) => ts.iter_mut().collect(),
+            Self::Sum(ts) => ts.iter_mut().collect(),
             other => vec![other],
         }
     }
 
     /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
-    pub fn into_terms(self) -> Vec<Expr> {
+    pub fn into_terms(self) -> Vec<Self> {
         match self {
-            Expr::Sum(ts) => ts,
+            Self::Sum(ts) => ts,
             other => vec![other],
         }
     }
 
     /// Does this expression have the same variables and exponents as another expression?
-    pub fn is_like_term(&self, rhs: &Expr) -> bool {
+    pub fn is_like_term(&self, rhs: &Self) -> bool {
         let self_factors = self.factors();
         let rhs_factors = rhs.factors();
         rhs_factors
@@ -46,16 +46,17 @@ impl Expr {
     pub fn coefficient(self) -> BigRational {
         self.into_factors()
             .into_iter()
-            .filter_map(|t| t.num())
+            .filter_map(Self::num)
             .product()
     }
 
     /// Add two expressions. **If they are not like terms, this function will return an incorrect result**.
-    pub fn combine_like_terms(self, rhs: Expr) -> Expr {
-        let mut res = vec![Self::Num(self.clone().coefficient() + rhs.coefficient())];
-        res.extend(self.into_factors().into_iter().filter(|f| !f.is_num()));
+    #[must_use]
+    pub fn combine_like_terms(self, rhs: Self) -> Self {
+        let mut vec = vec![Self::Num(self.clone().coefficient() + rhs.coefficient())];
+        vec.extend(self.into_factors().into_iter().filter(|f| !f.is_num()));
 
-        let mut prod = Self::Product(res);
+        let mut prod = Self::Product(vec);
         prod.correct();
         prod
     }
@@ -74,9 +75,9 @@ impl Add for Expr {
             }
         }
 
-        let mut res = Self::Sum(self_terms);
-        res.correct();
-        res
+        let mut out = Self::Sum(self_terms);
+        out.correct();
+        out
     }
 }
 

@@ -1,4 +1,5 @@
 use super::{constant::Const, AngleMeasure::Radian, Expr};
+use anyhow::{Context, Error};
 use num::{BigInt, BigRational, ToPrimitive};
 use std::{
     convert::{TryFrom, TryInto},
@@ -38,22 +39,36 @@ impl From<i128> for Expr {
     }
 }
 
-impl From<(i128, i128)> for Expr
-{
+impl From<(i128, i128)> for Expr {
     fn from(i: (i128, i128)) -> Self {
         Self::Num(BigRational::from((i.0.into(), i.1.into())))
     }
 }
 
+/// Take a decimal number (like "5.64") and convert it to a rational number in lowest terms (in that case, 141/25).
+pub fn parse_decimal_rational(s: &str) -> Option<BigRational> {
+    let sep: Vec<_> = s.split('.').collect();
+
+    if sep.len() == 2 {
+        Some(
+            sep[0].parse::<BigRational>().ok()?
+                + sep[1].parse::<BigRational>().ok()?
+                    / BigInt::from(10i32.pow(sep[1].len() as u32)),
+        )
+    } else {
+        None
+    }
+}
+
 impl FromStr for Expr {
-    type Err = ();
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(n) = s.parse::<BigRational>() {
             Ok(Self::Num(n))
         } else {
             Ok(Self::Num(
-                BigRational::from_float(s.parse::<f64>().map_err(|_| ())?).ok_or(())?,
+                parse_decimal_rational(s).context("couldn't parse from float")?,
             ))
         }
     }

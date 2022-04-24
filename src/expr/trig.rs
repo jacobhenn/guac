@@ -14,7 +14,7 @@ impl AngleMeasure {
             AngleMeasure::Gradian => Expr::from_int(400),
             AngleMeasure::Degree => Expr::from_int(360),
             AngleMeasure::Minute => Expr::from_int(21600),
-            AngleMeasure::Second => Expr::from_int(1296000),
+            AngleMeasure::Second => Expr::from_int(1_296_000),
             AngleMeasure::HalfTurn => Expr::from_int(2),
             AngleMeasure::Quadrant => Expr::from_int(4),
             AngleMeasure::Sextant => Expr::from_int(6),

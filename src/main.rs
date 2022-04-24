@@ -3,7 +3,6 @@
 //! `guac` is a minimal stack-based (RPN) calculator with a basic knowledge of algebra.
 
 #![warn(missing_docs)]
-
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 #![allow(clippy::missing_errors_doc)]
@@ -21,13 +20,15 @@ mod mode;
 
 use crate::expr::Expr;
 use anyhow::{Context, Error};
+use colored::Colorize;
 use config::Config;
 use crossterm::{
     cursor,
     terminal::{self, ClearType},
-    ExecutableCommand, QueueableCommand,
+    QueueableCommand, ExecutableCommand,
 };
-use num::traits::Pow;
+use mode::Mode;
+use num::{traits::Pow, BigInt, BigRational, Signed};
 use std::{
     fmt::Display,
     io::{stdout, StdoutLock, Write},
@@ -67,8 +68,10 @@ pub struct State<'a> {
     stack: Vec<StackItem>,
     input: String,
     eex_input: String,
+    eex: bool,
     err: String,
-    mode: fn(&mut State<'a>) -> Result<bool, Error>,
+    mode: Mode,
+    select_idx: Option<usize>,
     config: Config,
     stdout: StdoutLock<'a>,
 }
@@ -81,11 +84,18 @@ impl<'a> State<'a> {
             .queue(cursor::MoveTo(0, cy))?;
 
         let mut s = String::new();
-        for n in &self.stack {
-            s.push_str(&format!("{} ", n));
+        for i in 0..self.stack.len() {
+            if Some(i) == self.select_idx {
+                s.push_str(&format!("{} ", self.stack[i].to_string().underline()));
+            } else {
+                s.push_str(&format!("{} ", self.stack[i]));
+            }
         }
 
         s.push_str(&self.input.to_string());
+        if self.eex {
+            s.push_str(&format!("e{}", self.eex_input));
+        }
 
         let (width, ..) = terminal::size().context("couldn't get terminal size")?;
         let width = width - 1;
@@ -95,6 +105,13 @@ impl<'a> State<'a> {
         }
 
         print!("{}", s);
+
+        if self.select_idx.is_some() {
+            self.stdout.queue(cursor::Hide)?;
+        } else {
+            self.stdout.queue(cursor::Show)?;
+        }
+
         self.stdout.flush()?;
 
         Ok(())
@@ -107,22 +124,46 @@ impl<'a> State<'a> {
         });
     }
 
-    fn push_input(&mut self) {
+    fn drop(&mut self) {
+        if let Some(i) = self.select_idx {
+            self.stack.remove(i);
+
+            if i == self.stack.len() {
+                self.select_idx = None;
+            }
+        } else {
+            self.stack.pop();
+        }
+    }
+
+    fn push_input(&mut self) -> bool {
         let input = self.input.parse::<Expr>();
         if let Ok(expr) = input {
-            self.input.clear();
-            if let Ok(eex) = self.eex_input.parse::<i128>() {
+            if let Ok(eex) = self.eex_input.parse::<BigInt>() {
+                self.input.clear();
                 self.eex_input.clear();
                 self.stack.push(StackItem {
                     approx: self.input.contains('.') || eex.is_negative(),
-                    expr: expr * Expr::from_int(RADIX).pow(eex.into()),
+                    expr: expr * Expr::from_int(RADIX).pow(Expr::Num(BigRational::from(eex))),
                 });
+                self.eex = false;
+                true
+            } else if self.eex {
+                self.err = "bad eex input".to_string();
+                false
             } else {
+                self.input.clear();
                 self.stack.push(StackItem {
                     approx: self.input.contains('.'),
                     expr,
                 });
+                true
             }
+        } else if !self.input.is_empty() || !self.eex_input.is_empty() {
+            self.err = "bad input".to_string();
+            false
+        } else {
+            false
         }
     }
 
@@ -197,18 +238,28 @@ impl<'a> State<'a> {
         let (.., height) = terminal::size().context("couldn't get terminal size")?;
 
         // If the cursor is at the bottom of the screen, make room for one more line.
-        if cy == height {
+        if cy == height - 1 {
             println!();
-            self.stdout.execute(cursor::MoveTo(cx, cy - 1))?;
+            self.stdout.queue(cursor::MoveTo(cx, cy - 1))?;
         }
 
         loop {
-            if (self.mode)(self).context("couldn't tick state")? {
+            if match self.mode {
+                Mode::Normal() => self.normal(),
+                Mode::Constant() => self.constant(),
+                Mode::MassConstant() => self.mass_constant(),
+                Mode::Variable() => self.variable(),
+            }? {
                 break;
-            };
+            }
         }
 
-        println!();
+        self.stdout.execute(cursor::Show)?;
+        terminal::disable_raw_mode()?;
+
+        if !self.stack.is_empty() {
+            println!();
+        }
 
         Ok(())
     }
@@ -224,8 +275,10 @@ fn main() -> Result<(), Error> {
         stack: Vec::new(),
         input: String::new(),
         eex_input: String::new(),
+        eex: false,
         err: String::new(),
-        mode: State::normal,
+        mode: Mode::Normal(),
+        select_idx: None,
         config: Config::default(),
         stdout,
     };

@@ -5,7 +5,7 @@
 ## Keybindings
 
 - `q`: **q**uit
-- `[eE.0-9]`: type a number in the input (`e` for e-notation, `E` to type `e-`)
+- `[e\-.0-9]`: type a number in the input (`e` for e-notation)
 - `[\n ]`: push the input to the stack
 - `+`: add
 - `-`: subtract

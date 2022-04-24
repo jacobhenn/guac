@@ -11,20 +11,22 @@ use std::{
 
 impl Expr {
     /// Take the logarithm of self in base `base`. Perform obvious simplifications.
-    pub fn log(self, base: Expr) -> Expr {
-        if let Expr::Power(b, e) = self {
+    #[must_use]
+    pub fn log(self, base: Self) -> Self {
+        if let Self::Power(b, e) = self {
             if base == *b {
                 return *e;
-            } else {
-                return *b * base.log(*e);
             }
+
+            return *b * base.log(*e);
         }
 
-        Expr::Log(Box::new(base), Box::new(self))
+        Self::Log(Box::new(base), Box::new(self))
     }
 
     /// Take the square root of this expression.
-    pub fn sqrt(self) -> Expr {
+    #[must_use]
+    pub fn sqrt(self) -> Self {
         self.pow((1, 2).into())
     }
 }
@@ -77,14 +79,14 @@ impl Div for Expr {
     }
 }
 
-impl Pow<Expr> for Expr {
+impl Pow<Self> for Expr {
     type Output = Self;
 
     fn pow(mut self, mut rhs: Self) -> Self::Output {
         self.correct();
         rhs.correct();
 
-        let mut res = match (self, rhs) {
+        let mut out = match (self, rhs) {
             (Self::Num(b), Self::Num(e)) => {
                 if e.is_integer() {
                     Self::Num(b.pow(e.numer()))
@@ -97,8 +99,8 @@ impl Pow<Expr> for Expr {
             (b, e) => Self::Power(Box::new(b), Box::new(e)),
         };
 
-        res.correct();
-        res
+        out.correct();
+        out
     }
 }
 
@@ -119,7 +121,7 @@ impl Inv for Expr {
 }
 
 impl Rem for Expr {
-    type Output = Expr;
+    type Output = Self;
 
     fn rem(self, rhs: Self) -> Self::Output {
         if self < rhs {
@@ -131,20 +133,20 @@ impl Rem for Expr {
             (lhs, rhs) => {
                 let lhs_factors = lhs.into_factors();
                 let rhs_factors = rhs.clone().into_factors();
-                let outer_factors: Vec<Expr> = rhs
+                let outer_factors: Vec<Self> = rhs
                     .into_factors()
                     .into_iter()
                     .filter(|rf| lhs_factors.contains(rf))
                     .collect();
-                let left: Expr = lhs_factors
+                let left: Self = lhs_factors
                     .into_iter()
                     .filter(|e| !outer_factors.contains(e))
                     .product();
-                let right: Expr = rhs_factors
+                let right: Self = rhs_factors
                     .into_iter()
                     .filter(|e| !outer_factors.contains(e))
                     .product();
-                outer_factors.into_iter().product::<Expr>()
+                outer_factors.into_iter().product::<Self>()
                     * match (left, right) {
                         (Self::Num(n), Self::Num(m)) => Self::Num(n % m),
                         (left, right) => Self::Mod(Box::new(left), Box::new(right)),
@@ -168,7 +170,10 @@ impl Sum for Expr {
 
 impl PartialOrd for Expr {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.clone().to_f64().ok()?.partial_cmp(&other.clone().to_f64().ok()?)
+        self.clone()
+            .to_f64()
+            .ok()?
+            .partial_cmp(&other.clone().to_f64().ok()?)
     }
 }
 
