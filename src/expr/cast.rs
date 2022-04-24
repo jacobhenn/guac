@@ -11,16 +11,16 @@ impl TryFrom<Expr> for f64 {
     fn try_from(value: Expr) -> Result<Self, Self::Error> {
         match value {
             Expr::Num(n) => n.to_f64().ok_or(()),
-            Expr::Sum(ts) => ts.into_iter().map(<Expr as TryInto<f64>>::try_into).sum(),
+            Expr::Sum(ts) => ts.into_iter().map(Expr::to_f64).sum(),
             Expr::Product(fs) => fs
                 .into_iter()
-                .map(<Expr as TryInto<f64>>::try_into)
-                .product::<Result<f64, _>>(),
-            Expr::Power(b, e) => Ok(b.to_f64().ok_or(())?.powf(e.to_f64().ok_or(())?)),
-            Expr::Log(b, a) => Ok(a.to_f64().ok_or(())?.log(b.to_f64().ok_or(())?)),
+                .map(<Expr as TryInto<Self>>::try_into)
+                .product::<Result<Self, _>>(),
+            Expr::Power(b, e) => Ok(b.to_f64()?.powf(e.to_f64()?)),
+            Expr::Log(b, a) => Ok(a.to_f64()?.log(b.to_f64()?)),
             Expr::Const(c) => Ok(c.into()),
-            Expr::Mod(x, y) => Ok(x.to_f64().ok_or(())? % y.to_f64().ok_or(())?),
-            Expr::Sin(x, m) => Ok(x.convert_angle(m, Radian).to_f64().ok_or(())?.sin()),
+            Expr::Mod(x, y) => Ok(x.to_f64()? % y.to_f64()?),
+            Expr::Sin(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.sin()),
             _ => Err(()),
         }
     }
@@ -38,12 +38,9 @@ impl From<i128> for Expr {
     }
 }
 
-impl<T, U> From<(T, U)> for Expr
-where
-    T: Into<BigInt>,
-    U: Into<BigInt>,
+impl From<(i128, i128)> for Expr
 {
-    fn from(i: (T, U)) -> Self {
+    fn from(i: (i128, i128)) -> Self {
         Self::Num(BigRational::from((i.0.into(), i.1.into())))
     }
 }

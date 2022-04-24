@@ -168,7 +168,7 @@ impl Sum for Expr {
 
 impl PartialOrd for Expr {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.to_f64()?.partial_cmp(&other.to_f64()?)
+        self.clone().to_f64().ok()?.partial_cmp(&other.clone().to_f64().ok()?)
     }
 }
 

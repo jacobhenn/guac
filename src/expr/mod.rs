@@ -36,16 +36,16 @@ pub enum Expr {
     Num(BigRational),
 
     /// A sum of terms (pairs of rational and non-rational factors).
-    Sum(Vec<Expr>),
+    Sum(Vec<Self>),
 
     /// A product of a rational coefficient and a number of non-rational expressions. It is not inherently guaranteed that the expressions will be non-rational, but `Expr::correct` will make them so.
-    Product(Vec<Expr>),
+    Product(Vec<Self>),
 
     /// One expression raised to the power of another.
-    Power(Box<Expr>, Box<Expr>),
+    Power(Box<Self>, Box<Self>),
 
     /// The base-(first expression) logarithm of the second expression.
-    Log(Box<Expr>, Box<Expr>),
+    Log(Box<Self>, Box<Self>),
 
     /// A variable.
     Var(String),
@@ -54,30 +54,31 @@ pub enum Expr {
     Const(Const),
 
     /// One expression modulo another.
-    Mod(Box<Expr>, Box<Expr>),
+    Mod(Box<Self>, Box<Self>),
 
     /// The sine of another expression in the given units.
-    Sin(Box<Expr>, AngleMeasure),
+    Sin(Box<Self>, AngleMeasure),
 
     /// The cosine of another expression in the given units.
-    Cos(Box<Expr>, AngleMeasure),
+    Cos(Box<Self>, AngleMeasure),
 
     /// The tangent of another expression in the given units.
-    Tan(Box<Expr>, AngleMeasure),
+    Tan(Box<Self>, AngleMeasure),
 }
 
 impl Expr {
     /// Is this expression a Num variant?
-    pub fn is_num(&self) -> bool {
+    pub const fn is_num(&self) -> bool {
         matches!(self, Self::Num(..))
     }
 
     /// Is this expression a Mod variant?
-    pub fn is_mod(&self) -> bool {
+    pub const fn is_mod(&self) -> bool {
         matches!(self, Self::Mod(..))
     }
 
     /// Return the contents of this expression if it's a Num; if not, return None.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn num(self) -> Option<BigRational> {
         match self {
             Self::Num(n) => Some(n),
@@ -86,17 +87,16 @@ impl Expr {
     }
 
     /// Returns a floating-point approximation of the real number represented by this expression.
-    pub fn to_f64(&self) -> Option<f64> {
-        self.clone().try_into().ok()
+    pub fn to_f64(self) -> Result<f64, ()> {
+        self.try_into()
     }
 
     /// Performs obvious and computationally inexpensive simplifications.
     pub fn correct(&mut self) {
         match self {
-            Self::Num(_) => (),
             Self::Sum(ts) => {
                 for t in ts.iter_mut() {
-                    t.correct()
+                    t.correct();
                 }
                 ts.retain(|t| !t.is_zero());
                 if ts.len() == 1 {

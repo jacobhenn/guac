@@ -26,7 +26,7 @@ impl Expr {
     }
 
     /// Use the grouping priority of `self` and `child` to decide wether or not to surround `child` in parens, then format it.
-    pub fn format_child(&self, child: &Expr) -> String {
+    pub fn format_child(&self, child: &Self) -> String {
         if child.grouping_priority() > self.grouping_priority() || child.is_mod() {
             format!("({})", child)
         } else {
@@ -35,12 +35,12 @@ impl Expr {
     }
 
     /// Format this expression, but don't try to split products into a numerator and denominator.
-    pub fn product_safe_format(&self, child: &Expr) -> String {
+    pub fn product_safe_format(&self, child: &Self) -> String {
         match child {
             Self::Product(v) => {
                 let str = v
                     .iter()
-                    .map(|t| self.format_child(&t))
+                    .map(|t| self.format_child(t))
                     .collect::<Vec<_>>()
                     .join("·");
 
@@ -68,25 +68,25 @@ impl Display for Expr {
         match self {
             Self::Num(n) => write!(f, "{}", n),
             Self::Sum(ts) => {
-                let (pos, neg): (Vec<&Expr>, Vec<&Expr>) = ts.iter().partition(|t| t.is_positive());
+                let (pos, neg): (Vec<&Self>, Vec<&Self>) = ts.iter().partition(|t| t.is_positive());
 
                 write!(
                     f,
                     "{}",
                     pos.iter()
-                        .map(|t| self.format_child(&t))
+                        .map(|t| self.format_child(t))
                         .collect::<Vec<_>>()
                         .join("+")
                 )?;
 
                 for n in neg {
-                    write!(f, "-{}", self.format_child(&n.clone().neg()))?
+                    write!(f, "-{}", self.format_child(&n.clone().neg()))?;
                 }
 
                 Ok(())
             }
             Self::Product(fs) => {
-                let (numer_vec, denom_vec): (Vec<&Expr>, Vec<&Expr>) =
+                let (numer_vec, denom_vec): (Vec<&Self>, Vec<&Self>) =
                     fs.iter().partition(|f| f.has_pos_exp());
 
                 let mut numer = Self::Product(numer_vec.into_iter().map(Clone::clone).collect());

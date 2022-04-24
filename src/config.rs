@@ -2,44 +2,16 @@
 
 use std::fmt::{Display, Formatter, self};
 
-use termion::event::Key;
-
 pub struct Config {
     pub angle_measure: AngleMeasure,
-    pub keybindings: Keybindings,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             angle_measure: AngleMeasure::Radian,
-            keybindings: Keybindings::default(),
         }
     }
-}
-
-pub struct Keybindings {
-    pub add: Key,
-    pub mul: Key,
-}
-
-impl Default for Keybindings {
-    fn default() -> Self {
-        Keybindings {
-            add: Key::Char('+'),
-            mul: Key::Char('*')
-        }
-    }
-}
-
-pub struct RawConfig {
-    pub angle_measure: AngleMeasure,
-    pub keybindings: RawKeybindings,
-}
-
-pub struct RawKeybindings {
-    pub add: String,
-    pub mul: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

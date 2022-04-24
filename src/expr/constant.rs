@@ -64,6 +64,7 @@ impl Display for Const {
     }
 }
 
+#[allow(clippy::use_self)]
 impl From<Const> for f64 {
     fn from(c: Const) -> Self {
         match c {

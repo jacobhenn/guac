@@ -4,6 +4,14 @@
 
 #![warn(missing_docs)]
 
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::enum_glob_use)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::must_use_candidate)]
+
 /// Provides the `Expr` type and various methods for working with it
 pub mod expr;
 
@@ -14,16 +22,17 @@ mod mode;
 use crate::expr::Expr;
 use anyhow::{Context, Error};
 use config::Config;
+use crossterm::{
+    cursor,
+    terminal::{self, ClearType},
+    ExecutableCommand, QueueableCommand,
+};
 use num::traits::Pow;
 use std::{
     fmt::Display,
-    io::{self, StdinLock, StdoutLock, Write},
+    io::{stdout, StdoutLock, Write},
     ops::Deref,
 };
-use termion::cursor::DetectCursorPos;
-use termion::input::{Keys, TermRead};
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::{clear, cursor};
 
 const RADIX: u32 = 10;
 
@@ -37,7 +46,7 @@ pub struct StackItem {
 impl Display for StackItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.approx {
-            if let Some(n) = self.expr.to_f64() {
+            if let Ok(n) = self.expr.clone().to_f64() {
                 return write!(f, "{:.3}", n);
             }
         }
@@ -61,17 +70,15 @@ pub struct State<'a> {
     err: String,
     mode: fn(&mut State<'a>) -> Result<bool, Error>,
     config: Config,
-    stdin: Keys<StdinLock<'a>>,
-    stdout: RawTerminal<StdoutLock<'a>>,
+    stdout: StdoutLock<'a>,
 }
 
 impl<'a> State<'a> {
     fn render(&mut self) -> Result<(), Error> {
-        let (_, cy) = self
-            .stdout
-            .cursor_pos()
-            .context("couldn't get cursor pos")?;
-        print!("{}{}", clear::CurrentLine, cursor::Goto(0, cy),);
+        let (_, cy) = cursor::position().context("couldn't get cursor pos")?;
+        self.stdout
+            .queue(terminal::Clear(ClearType::CurrentLine))?
+            .queue(cursor::MoveTo(0, cy))?;
 
         let mut s = String::new();
         for n in &self.stack {
@@ -80,7 +87,7 @@ impl<'a> State<'a> {
 
         s.push_str(&self.input.to_string());
 
-        let (width, ..) = termion::terminal_size().context("couldn't get terminal size")?;
+        let (width, ..) = terminal::size().context("couldn't get terminal size")?;
         let width = width - 1;
 
         if s.len() > width as usize {
@@ -103,15 +110,14 @@ impl<'a> State<'a> {
     fn push_input(&mut self) {
         let input = self.input.parse::<Expr>();
         if let Ok(expr) = input {
+            self.input.clear();
             if let Ok(eex) = self.eex_input.parse::<i128>() {
-                self.input.clear();
                 self.eex_input.clear();
                 self.stack.push(StackItem {
                     approx: self.input.contains('.') || eex.is_negative(),
                     expr: expr * Expr::from_int(RADIX).pow(eex.into()),
                 });
             } else {
-                self.input.clear();
                 self.stack.push(StackItem {
                     approx: self.input.contains('.'),
                     expr,
@@ -187,16 +193,13 @@ impl<'a> State<'a> {
     }
 
     fn start(&mut self) -> Result<(), Error> {
-        let (cx, cy) = self
-            .stdout
-            .cursor_pos()
-            .context("couldn't get cursor pos")?;
-        let (.., height) = termion::terminal_size().context("couldn't get terminal size")?;
+        let (cx, cy) = cursor::position().context("couldn't get cursor pos")?;
+        let (.., height) = terminal::size().context("couldn't get terminal size")?;
 
         // If the cursor is at the bottom of the screen, make room for one more line.
         if cy == height {
-            print!("\n{}", cursor::Goto(cx, cy - 1));
-            self.stdout.flush()?;
+            println!();
+            self.stdout.execute(cursor::MoveTo(cx, cy - 1))?;
         }
 
         loop {
@@ -212,11 +215,10 @@ impl<'a> State<'a> {
 }
 
 fn main() -> Result<(), Error> {
-    let stdout = io::stdout();
-    let stdout = stdout.lock().into_raw_mode()?;
+    let stdout = stdout();
+    let stdout = stdout.lock();
 
-    let stdin = io::stdin();
-    let stdin = stdin.lock().keys();
+    terminal::enable_raw_mode()?;
 
     let mut state = State {
         stack: Vec::new(),
@@ -225,7 +227,6 @@ fn main() -> Result<(), Error> {
         err: String::new(),
         mode: State::normal,
         config: Config::default(),
-        stdin,
         stdout,
     };
 
