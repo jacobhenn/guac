@@ -205,8 +205,10 @@ impl Signed for Expr {
     fn signum(&self) -> Self {
         if self.is_negative() {
             Self::one().neg()
-        } else {
+        } else if self.is_positive() {
             Self::one()
+        } else {
+            Self::zero()
         }
     }
 
@@ -216,6 +218,6 @@ impl Signed for Expr {
     }
 
     fn is_negative(&self) -> bool {
-        !self.is_positive()
+        !self.is_positive() && !self.is_zero()
     }
 }

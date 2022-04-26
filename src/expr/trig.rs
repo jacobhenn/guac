@@ -1,6 +1,6 @@
 use std::{convert::TryInto, ops::Neg};
 
-use num::{One, Signed, Zero};
+use num::{One, Signed, Zero, traits::Pow};
 
 use crate::config::AngleMeasure;
 
@@ -43,17 +43,16 @@ impl Expr {
     /// Convert this expression from one angle measure into another.
     #[must_use]
     pub fn convert_angle(self, old_measure: AngleMeasure, new_measure: AngleMeasure) -> Self {
-        self.into_turns(old_measure) * new_measure.full_turn()
+        self.into_turns(old_measure).turns_to(new_measure)
     }
 
     /// Take the sine of this expression as an angle in `measure`.
     #[must_use]
     pub fn generic_sin(self, measure: AngleMeasure) -> Self {
         let turns = self.clone().into_turns(measure) % Self::one();
-        print!("{}", turns);
 
         let onehalf: Self = (1, 2).into();
-        if turns.is_negative() && !turns.is_zero() {
+        if turns.is_negative() {
             return self.neg().generic_sin(measure).neg();
         } else if turns >= onehalf {
             return (turns - onehalf)
@@ -68,7 +67,7 @@ impl Expr {
             Self::Num(n) => match (n.numer().try_into(), n.denom().try_into()) {
                 (Ok(0), ..) => Self::zero(),
                 (Ok(1), Ok(4)) => Self::one(),
-                (Ok(1), Ok(8)) => Self::from(2).sqrt() / Self::from(2),
+                (Ok(1), Ok(8)) => Self::from(2).pow(Expr::from((1, 2)).neg()),
                 (Ok(1), Ok(6)) => Self::from(3).sqrt() / Self::from(2),
                 (Ok(1), Ok(12)) => (1, 2).into(),
                 _ => Self::Sin(Box::new(self), measure),
@@ -83,7 +82,7 @@ impl Expr {
         let turns = self.clone().into_turns(measure) % Self::one();
 
         let onehalf: Self = (1, 2).into();
-        if turns.is_negative() && !turns.is_zero() {
+        if turns.is_negative() {
             return self.neg().generic_cos(measure);
         } else if turns >= onehalf {
             return (Self::one() - turns).turns_to(measure).generic_cos(measure);
@@ -98,7 +97,7 @@ impl Expr {
             Self::Num(n) => match (n.numer().try_into(), n.denom().try_into()) {
                 (Ok(0), ..) => Self::one(),
                 (Ok(1), Ok(4)) => Self::zero(),
-                (Ok(1), Ok(8)) => Self::from(2).sqrt() / Self::from(2),
+                (Ok(1), Ok(8)) => Self::from(2).pow(Expr::from((1, 2)).neg()),
                 (Ok(1), Ok(6)) => (1, 2).into(),
                 (Ok(1), Ok(12)) => Self::from(3).sqrt() / Self::from(2),
                 _ => Self::Cos(Box::new(self), measure),
@@ -113,7 +112,7 @@ impl Expr {
         let onehalf: Self = (1, 2).into();
 
         let turns = self.clone().into_turns(measure) % onehalf.clone();
-        if turns.is_negative() && !turns.is_zero() {
+        if turns.is_negative() {
             return self.neg().generic_tan(measure);
         } else if turns > (1, 4).into() {
             return (onehalf - turns)

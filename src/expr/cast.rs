@@ -40,8 +40,8 @@ impl From<i128> for Expr {
 }
 
 impl From<(i128, i128)> for Expr {
-    fn from(i: (i128, i128)) -> Self {
-        Self::Num(BigRational::from((i.0.into(), i.1.into())))
+    fn from((n, d): (i128, i128)) -> Self {
+        Self::Num((n.into(), d.into()).into())
     }
 }
 
