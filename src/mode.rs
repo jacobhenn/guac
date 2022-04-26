@@ -38,8 +38,8 @@ impl<'a> State<'a> {
         let colored_line = format!(
             "{} {} {} {}",
             self.err.red(),
-            "(q: quit)".blue(),
-            self.config.angle_measure.to_string().blue(),
+            "(q: quit)",
+            self.config.angle_measure.to_string(),
             mode.yellow(),
         );
 
@@ -64,8 +64,7 @@ impl<'a> State<'a> {
         self.write_modeline("").context("couldn't write modeline")?;
         self.err.clear();
 
-        if let Key(KeyEvent { code, modifiers }) = event::read()? {
-            if modifiers.is_empty() {
+        if let Key(KeyEvent { code, .. }) = event::read()? {
                 match code {
                     Char(c)
                         if self.select_idx.is_none()
@@ -170,7 +169,19 @@ impl<'a> State<'a> {
                     Char('g') => self.apply_unary(|x| x.log(Expr::Const(Const::E))),
                     Char('%') => self.apply_binary(|x, y| x % y),
                     Char('r') => self.apply_unary(Expr::sqrt),
-                    Char('`') => self.apply_unary(Inv::inv),
+                    Char('`') => {
+                        if let Ok(n) = self.input.parse::<BigInt>() {
+                            if n.is_zero() {
+                                self.err = "divide by zero".to_string();
+                            } else {
+                                self.apply_unary(Inv::inv);
+                            }
+                        } else if self.stack[self.stack.len() - 1].expr.is_zero() {
+                            self.err = "divide by zero".to_string();
+                        } else {
+                            self.apply_unary(Inv::inv);
+                        }
+                    },
                     Char('~') => self.apply_unary(Neg::neg),
                     Char('|') => self.apply_unary(|x| x.abs()),
                     Char('s') => {
@@ -229,15 +240,10 @@ impl<'a> State<'a> {
                             }
                         }
                     }
-                    _ => (),
-                }
-            } else if modifiers == KeyModifiers::SHIFT {
-                match code {
                     Char('G') => self.apply_binary(|x, y| y.log(x)),
                     Char('R') => self.apply_unary(|x| x.pow(2.into())),
                     _ => (),
                 }
-            }
         }
 
         self.render().context("couldn't render")?;
