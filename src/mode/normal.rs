@@ -24,12 +24,12 @@ impl<'a> State<'a> {
             KeyCode::Char(c)
                 if self.select_idx.is_none() && self.eex && (c.is_digit(RADIX) || c == '-') =>
             {
-                self.eex_input.push(c)
+                self.eex_input.push(c);
             }
             KeyCode::Char(c)
                 if self.select_idx.is_none() && !self.eex && (c.is_digit(RADIX) || c == '.') =>
             {
-                self.input.push(c)
+                self.input.push(c);
             }
             KeyCode::Char('q') | KeyCode::Esc => return Ok(true),
             KeyCode::Char(';') => self.toggle_approx(),
@@ -47,12 +47,10 @@ impl<'a> State<'a> {
                         } else {
                             self.eex_input.pop();
                         }
+                    } else if self.input.is_empty() {
+                        self.drop();
                     } else {
-                        if self.input.is_empty() {
-                            self.drop();
-                        } else {
-                            self.input.pop();
-                        }
+                        self.input.pop();
                     }
                 }
                 Some(i) => {
@@ -87,20 +85,19 @@ impl<'a> State<'a> {
                 |x, y| x / y,
                 |_, y| y.is_zero().then(|| SoftError::DivideByZero),
             ),
-            KeyCode::Char('^') => self.apply_binary(
-                |x, y| x.pow(y),
-                |x, y| (x.is_zero() && y.is_negative()).then(|| SoftError::DivideByZero),
-            ),
+            KeyCode::Char('^') => self.apply_binary(Pow::pow, |x, y| {
+                (x.is_zero() && y.is_negative()).then(|| SoftError::DivideByZero)
+            }),
             KeyCode::Char('g') => self.apply_unary(|x| x.log(Expr::Const(Const::E)), |_| None),
             KeyCode::Char('%') => self.apply_binary(
                 |x, y| x % y,
                 |_, y| y.is_zero().then(|| SoftError::DivideByZero),
             ),
             KeyCode::Char('r') => {
-                self.apply_unary(Expr::sqrt, |x| x.is_negative().then(|| SoftError::Complex))
+                self.apply_unary(Expr::sqrt, |x| x.is_negative().then(|| SoftError::Complex));
             }
             KeyCode::Char('`') => {
-                self.apply_unary(Inv::inv, |x| x.is_zero().then(|| SoftError::DivideByZero))
+                self.apply_unary(Inv::inv, |x| x.is_zero().then(|| SoftError::DivideByZero));
             }
             KeyCode::Char('~') => self.apply_unary(Neg::neg, |_| None),
             KeyCode::Char('|') => self.apply_unary(|x| x.abs(), |_| None),
@@ -120,7 +117,7 @@ impl<'a> State<'a> {
                         (x.clone().into_turns(angle_measure) % (1, 2).into() == (1, 4).into())
                             .then(|| SoftError::BadTan)
                     },
-                )
+                );
             }
             KeyCode::Char('x') => self.push_expr(Expr::Var("x".to_string())),
             KeyCode::Char('k') => self.mode = Mode::Constant,
@@ -137,11 +134,9 @@ impl<'a> State<'a> {
                         self.stack.swap(*i, *i - 1);
                         *i -= 1;
                     }
-                } else {
-                    if self.push_input() {
-                        self.swap();
-                        self.select_idx = Some(self.stack.len() - 2);
-                    }
+                } else if self.push_input() {
+                    self.swap();
+                    self.select_idx = Some(self.stack.len() - 2);
                 }
             }
             KeyCode::Char('>') => {

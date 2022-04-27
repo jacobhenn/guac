@@ -44,8 +44,8 @@ impl<'a> State<'a> {
             "{} {} {} {}",
             self.err
                 .as_ref()
-                .map(|x| x.to_string())
-                .unwrap_or(String::new()),
+                .map(ToString::to_string)
+                .unwrap_or_default(),
             "(q: quit)",
             self.config.angle_measure,
             self.mode,
@@ -55,8 +55,8 @@ impl<'a> State<'a> {
             "{} {} {} {}",
             self.err
                 .as_ref()
-                .map(|x| x.to_string())
-                .unwrap_or(String::new())
+                .map(ToString::to_string)
+                .unwrap_or_default()
                 .red(),
             "(q: quit)",
             self.config.angle_measure,

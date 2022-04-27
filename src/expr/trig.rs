@@ -67,7 +67,7 @@ impl Expr {
             Self::Num(n) => match (n.numer().try_into(), n.denom().try_into()) {
                 (Ok(0), ..) => Self::zero(),
                 (Ok(1), Ok(4)) => Self::one(),
-                (Ok(1), Ok(8)) => Self::from(2).pow(Expr::from((1, 2)).neg()),
+                (Ok(1), Ok(8)) => Self::from(2).pow(Self::from((1, 2)).neg()),
                 (Ok(1), Ok(6)) => Self::from(3).sqrt() / Self::from(2),
                 (Ok(1), Ok(12)) => (1, 2).into(),
                 _ => Self::Sin(Box::new(self), measure),
@@ -97,7 +97,7 @@ impl Expr {
             Self::Num(n) => match (n.numer().try_into(), n.denom().try_into()) {
                 (Ok(0), ..) => Self::one(),
                 (Ok(1), Ok(4)) => Self::zero(),
-                (Ok(1), Ok(8)) => Self::from(2).pow(Expr::from((1, 2)).neg()),
+                (Ok(1), Ok(8)) => Self::from(2).pow(Self::from((1, 2)).neg()),
                 (Ok(1), Ok(6)) => (1, 2).into(),
                 (Ok(1), Ok(12)) => Self::from(3).sqrt() / Self::from(2),
                 _ => Self::Cos(Box::new(self), measure),

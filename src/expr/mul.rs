@@ -1,5 +1,5 @@
 use super::Expr;
-use num::{traits::{Pow, Inv}, One, BigRational};
+use num::{traits::Pow, One};
 use std::ops::{Mul, MulAssign};
 
 impl Expr {
