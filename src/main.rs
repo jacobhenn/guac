@@ -23,9 +23,9 @@ use anyhow::{Context, Error};
 use colored::Colorize;
 use config::Config;
 use crossterm::{
-    cursor,
+    cursor, event,
     terminal::{self, ClearType},
-    QueueableCommand, ExecutableCommand,
+    ExecutableCommand, QueueableCommand,
 };
 use mode::Mode;
 use num::{traits::Pow, BigInt, BigRational, Signed};
@@ -36,6 +36,40 @@ use std::{
 };
 
 const RADIX: u32 = 10;
+
+/// A representation of an error on the user's end.
+pub enum SoftError {
+    /// Operation would divided by zero.
+    DivideByZero,
+
+    /// Operation would produce a complex result, which is not yet supported by `guac`.
+    Complex,
+
+    /// Input could not be parsed.
+    BadInput,
+
+    /// Eex input (input after the `e` in e-notation) could not be parsed.
+    BadEex,
+
+    /// The argument of `tan` was not in its domain.
+    BadTan,
+
+    /// The argument of `log` was not in its domain.
+    BadLog,
+}
+
+impl Display for SoftError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DivideByZero => write!(f, "E0: divide by zero"),
+            Self::Complex => write!(f, "E1: complex not yet supported"),
+            Self::BadInput => write!(f, "E2: bad input"),
+            Self::BadEex => write!(f, "E3: bad eex input"),
+            Self::BadTan => write!(f, "E4: tangent of π/2"),
+            Self::BadLog => write!(f, "E5: log of n ≤ 0"),
+        }
+    }
+}
 
 /// An expression, along with other data necessary for displaying it but not for doing math with it.
 #[derive(Clone)]
@@ -69,7 +103,7 @@ pub struct State<'a> {
     input: String,
     eex_input: String,
     eex: bool,
-    err: String,
+    err: Option<SoftError>,
     mode: Mode,
     select_idx: Option<usize>,
     config: Config,
@@ -149,7 +183,7 @@ impl<'a> State<'a> {
                 self.eex = false;
                 true
             } else if self.eex {
-                self.err = "bad eex input".to_string();
+                self.err = Some(SoftError::BadEex);
                 false
             } else {
                 self.input.clear();
@@ -160,7 +194,7 @@ impl<'a> State<'a> {
                 true
             }
         } else if !self.input.is_empty() || !self.eex_input.is_empty() {
-            self.err = "bad input".to_string();
+            self.err = Some(SoftError::BadInput);
             false
         } else {
             false
@@ -177,15 +211,31 @@ impl<'a> State<'a> {
         }
     }
 
-    fn apply_binary<F>(&mut self, f: F)
+    fn apply_binary<F, G>(&mut self, f: F, are_in_domain: G)
     where
         F: Fn(Expr, Expr) -> Expr,
+        G: Fn(&Expr, &Expr) -> Option<SoftError>,
     {
-        if !self.stack.is_empty() {
-            self.push_input();
-        }
+        let pushed_input = if self.stack.is_empty() {
+            false
+        } else {
+            self.push_input()
+        };
 
         if self.stack.len() >= 2 {
+            if let Some(e) = are_in_domain(
+                &self.stack[self.stack.len() - 2],
+                self.stack.last().unwrap(),
+            ) {
+                self.err = Some(e);
+
+                if pushed_input {
+                    self.input = self.stack.pop().unwrap().to_string();
+                }
+
+                return;
+            }
+
             if let (Some(x), Some(y)) = (self.stack.pop(), self.stack.pop()) {
                 self.stack.push(StackItem {
                     approx: x.approx || y.approx,
@@ -195,13 +245,24 @@ impl<'a> State<'a> {
         }
     }
 
-    fn apply_unary<F>(&mut self, f: F)
+    fn apply_unary<F, G>(&mut self, f: F, is_in_domain: G)
     where
         F: Fn(Expr) -> Expr,
+        G: Fn(&Expr) -> Option<SoftError>,
     {
-        self.push_input();
+        let pushed_input = self.push_input();
 
         if !self.stack.is_empty() {
+            if let Some(e) = is_in_domain(self.stack.last().unwrap()) {
+                self.err = Some(e);
+
+                if pushed_input {
+                    self.input = self.stack.pop().unwrap().to_string();
+                }
+
+                return;
+            }
+
             if let Some(x) = self.stack.pop() {
                 self.stack.push(StackItem {
                     approx: x.approx,
@@ -244,27 +305,41 @@ impl<'a> State<'a> {
         }
 
         loop {
-            if match self.mode {
-                Mode::Normal() => self.normal(),
-                Mode::Constant() => self.constant(),
-                Mode::MassConstant() => self.mass_constant(),
-                Mode::Variable() => self.variable(),
-            }? {
-                break;
+            self.write_modeline().context("couldn't write modeline")?;
+
+            match event::read()? {
+                event::Event::Key(k) => {
+                    if match self.mode {
+                        Mode::Normal => self.normal(k),
+                        Mode::Constant => self.constant(k),
+                        Mode::MassConstant => self.mass_constant(k),
+                        Mode::Variable => self.variable(k),
+                    }? {
+                        break;
+                    }
+                }
+                event::Event::Resize(_, _) => {
+                    self.render().context("couldn't render")?;
+                    self.write_modeline().context("couldn't write modeline")?;
+                }
+                _ => (),
             }
         }
 
-        self.stdout.execute(cursor::Show).context("while cleaning up: couldn't show cursor")?;
+        self.stdout
+            .execute(cursor::Show)
+            .context("while cleaning up: couldn't show cursor")?;
         terminal::disable_raw_mode().context("while cleaning up: couldn't disable raw mode")?;
 
         println!();
-        self
-            .stdout
+        self.stdout
             .execute(terminal::Clear(ClearType::CurrentLine))
             .context("while cleaning up: couldn't clear modeline")?;
 
         if self.stack.is_empty() {
-            self.stdout.execute(cursor::MoveUp(1)).context("while cleaning up: couldn't move cursor")?;
+            self.stdout
+                .execute(cursor::MoveUp(1))
+                .context("while cleaning up: couldn't move cursor")?;
         }
 
         Ok(())
@@ -282,8 +357,8 @@ fn main() -> Result<(), Error> {
         input: String::new(),
         eex_input: String::new(),
         eex: false,
-        err: String::new(),
-        mode: Mode::Normal(),
+        err: None,
+        mode: Mode::Normal,
         select_idx: None,
         config: Config::default(),
         stdout,
