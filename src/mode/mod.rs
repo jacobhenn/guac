@@ -60,7 +60,7 @@ impl<'a> State<'a> {
                 .red(),
             "(q: quit)",
             self.config.angle_measure,
-            self.mode.to_string().yellow(),
+            self.mode.to_string().yellow().bold(),
         );
 
         for y in (cy + 1)..height {

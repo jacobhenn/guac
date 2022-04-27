@@ -1,5 +1,5 @@
 use super::Expr;
-use num::{traits::Pow, One};
+use num::{traits::{Pow, Inv}, One, BigRational};
 use std::ops::{Mul, MulAssign};
 
 impl Expr {
@@ -32,6 +32,7 @@ impl Expr {
     #[must_use]
     pub fn base(&self) -> Self {
         match self {
+            Self::Num(n) if n.numer().is_one() => Self::Num(n.denom().clone().into()),
             Self::Power(b, ..) => *b.clone(),
             other => other.clone(),
         }
@@ -41,6 +42,7 @@ impl Expr {
     #[must_use]
     pub fn exponent(&self) -> Self {
         match self {
+            Self::Num(n) if n.numer().is_one() => Self::from(-1),
             Self::Power(_, e) => *e.clone(),
             _ => Self::one(),
         }
