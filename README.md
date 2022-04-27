@@ -2,10 +2,26 @@
 
 `guac` is a minimal but powerful stack-based (RPN) calculator which displays on just a few lines of the terminal.
 
+## Install
+
+`guac` has been verified to work on Linux and Windows, and may concievably work on MacOS. If you have the Rust toolchain installed, simply:
+
+```
+$ git clone https://github.com/jacobhenn/guac.git
+$ cd guac
+$ cargo install
+```
+
+If you won't be developing `guac`, run `cargo clean` after installing to save disc space.
+
 ## Keybindings
 
 - `q`: **q**uit
 - `[e\-.0-9]`: type a number in the input (`e` for e-notation)
+- `backspace`
+	- if the input is selected and not empty, drop the last char
+	- if the input is selected but empty, drop the top of the stack
+	- else, drop the expression *to the left of the selection*
 - `[\n ]`: push the input to the stack
 - `+`: add
 - `-`: subtract
@@ -13,7 +29,7 @@
 - `/`: divide
 - `` ` ``: reciprocal
 - `~`: opposite (by analogy to Vim's `~`)
-- `d`: **d**rop the topmost expression
+- `d`: **d**rop the selected expression, or the topmost expression if the input is selected
 - `^`: exponentiate
 - `l`: natural **l**og
 - `L`: **l**og with given base
@@ -25,6 +41,12 @@
 - `c`: **c**osine
 - `t`: **t**angent
 - `x`: push **x**
+- `h`: move selection to the left (by analogy to Vim's `h`)
+- `l`: move selection to the right (by analogy to Vim's `l`)
+- `>`: move selected expression to the right (by analogy to Vim's `>>`)
+- `<`: move selected expression to the left (by analogy to Vim's `<<`)
+- `right`: swap the selected expression (or the topmost one) with the expression to its left
+- `a`: cancel selection and jump to input (by analogy to Vim's `A`)
 - `v`: enter **v**ariable mode
     - `[A-Za-z]`: type in a custom variable name
     - `esc`: cancel
