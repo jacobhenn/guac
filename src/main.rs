@@ -238,9 +238,9 @@ impl<'a> State<'a> {
         let (.., height) = terminal::size().context("couldn't get terminal size")?;
 
         // If the cursor is at the bottom of the screen, make room for one more line.
-        if cy == height - 1 {
+        if cy >= height - 1 {
             println!();
-            self.stdout.queue(cursor::MoveTo(cx, cy - 1))?;
+            self.stdout.execute(cursor::MoveTo(cx, cy - 1))?;
         }
 
         loop {
@@ -254,11 +254,17 @@ impl<'a> State<'a> {
             }
         }
 
-        self.stdout.execute(cursor::Show)?;
-        terminal::disable_raw_mode()?;
+        self.stdout.execute(cursor::Show).context("while cleaning up: couldn't show cursor")?;
+        terminal::disable_raw_mode().context("while cleaning up: couldn't disable raw mode")?;
 
-        if !self.stack.is_empty() {
-            println!();
+        println!();
+        self
+            .stdout
+            .execute(terminal::Clear(ClearType::CurrentLine))
+            .context("while cleaning up: couldn't clear modeline")?;
+
+        if self.stack.is_empty() {
+            self.stdout.execute(cursor::MoveUp(1)).context("while cleaning up: couldn't move cursor")?;
         }
 
         Ok(())
