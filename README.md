@@ -9,7 +9,7 @@
 ```
 $ git clone https://github.com/jacobhenn/guac.git
 $ cd guac
-$ cargo install
+$ cargo install --path .
 ```
 
 If you won't be developing `guac`, run `cargo clean` after installing to save disc space.

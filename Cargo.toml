@@ -11,3 +11,10 @@ anyhow = "1"
 crossterm = "0.23"
 colored = "2"
 num = "0.4"
+argh = "0.1"
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"

@@ -29,65 +29,104 @@ impl Expr {
     }
 
     /// Return the base of this expression. e.g., x^2 -> x, x+5 -> x+5
-    #[must_use]
-    pub fn base(&self) -> Self {
+    // TODO: make this work correctly with fractions
+    pub fn base(&self) -> &Self {
         match self {
-            Self::Num(n) if n.numer().is_one() => Self::Num(n.denom().clone().into()),
-            Self::Power(b, ..) => *b.clone(),
-            other => other.clone(),
+            // Self::Num(n) if n.numer().is_one() => Self::Num(n.denom().into()),
+            Self::Power(b, ..) => b,
+            other => other,
         }
     }
 
     /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
-    #[must_use]
-    pub fn exponent(&self) -> Self {
+    // TODO: make this work correctly with fractions
+    pub fn exponent(&self) -> Option<&Self> {
         match self {
-            Self::Num(n) if n.numer().is_one() => Self::from(-1),
-            Self::Power(_, e) => *e.clone(),
-            _ => Self::one(),
+            // Self::Num(n) if n.numer().is_one() => Self::from(-1),
+            Self::Power(_, e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
+    // TODO: make this work correctly with fractions
+    pub fn exponent_mut(&mut self) -> Option<&mut Self> {
+        match self {
+            // Self::Num(n) if n.numer().is_one() => Self::from(-1),
+            Self::Power(_, e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
+    // TODO: make this work correctly with fractions
+    pub fn into_exponent(self) -> Self {
+        match self {
+            // Self::Num(n) if n.numer().is_one() => Self::from(-1),
+            Self::Power(_, e) => *e,
+            _ => One::one(),
+        }
+    }
+
+    /// Multiply two expressions. **Their exponents must be like terms, or this will be incorrect**.
+    pub fn combine_like_factors(&mut self, rhs: Self) {
+        if let Some(e) = self.exponent_mut() {
+            e.combine_like_terms(rhs.into_exponent())
+        } else {
+            *self = self.clone().pow(Self::one() + rhs.into_exponent());
         }
     }
 
     /// Do these two terms have the same base and like terms for exponents?
     pub fn is_like_factor(&self, rhs: &Self) -> bool {
-        self.base() == rhs.base() && self.exponent().is_like_term(&rhs.exponent())
+        self.base() == rhs.base()
+            && self
+                .exponent()
+                .unwrap_or(&One::one())
+                .is_like_term(rhs.exponent().unwrap_or(&One::one()))
+    }
+
+    /// Naively multiply two expressions, without performing any simplifications. Extends existing products instead of nesting.
+    pub fn push_factor(&mut self, rhs: Self) {
+        match self {
+            Self::Product(fs) => fs.extend(rhs.into_factors()),
+            other => {
+                let mut v = vec![other.clone()];
+                v.extend(rhs.into_factors());
+                *other = Self::Product(v);
+            }
+        }
     }
 }
 
 impl Mul for Expr {
     type Output = Self;
 
-    fn mul(self, rhs: Self) -> Self::Output {
-        if let Self::Sum(ts) = self {
-            return ts.into_iter().map(|t| t * rhs.clone()).sum();
-        } else if let Self::Sum(ts) = rhs {
-            return ts.into_iter().map(|t| t * self.clone()).sum();
-        }
-
-        let mut self_factors = self.into_factors();
-        for rhs_factor in rhs.into_factors() {
-            if let Some(self_factor) = self_factors
-                .iter_mut()
-                .find(|st| st.is_like_factor(&rhs_factor))
-            {
-                *self_factor = self_factor.base().pow(
-                    self_factor
-                        .exponent()
-                        .combine_like_terms(rhs_factor.exponent()),
-                );
-            } else {
-                self_factors.push(rhs_factor);
-            }
-        }
-
-        let mut out = Self::Product(self_factors);
-        out.correct();
-        out
+    fn mul(mut self, rhs: Self) -> Self::Output {
+        self *= rhs;
+        self
     }
 }
 
 impl MulAssign for Expr {
     fn mul_assign(&mut self, rhs: Self) {
-        *self = self.clone() * rhs;
+        let self_factors = self.factors();
+        let (like, unlike): (Vec<Expr>, Vec<Expr>) = rhs
+            .into_terms()
+            .into_iter()
+            .partition(|t| self_factors.iter().any(|st| t.is_like_factor(st)));
+
+        for factor in unlike {
+            self.push_factor(factor);
+        }
+
+        let mut self_factors = self.factors_mut();
+        for factor in like {
+            if let Some(self_factor) = self_factors.iter_mut().find(|f| factor.is_like_factor(f)) {
+                self_factor.combine_like_factors(factor);
+            }
+        }
+
+        self.correct();
     }
 }

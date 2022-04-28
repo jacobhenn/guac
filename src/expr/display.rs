@@ -58,7 +58,7 @@ impl Expr {
     pub fn has_pos_exp(&self) -> bool {
         match self {
             Self::Num(n) => !n.numer().is_one(),
-            other => other.exponent().is_positive(),
+            other => other.exponent().map(|e| e.is_positive()).unwrap_or(true)
         }
     }
 }

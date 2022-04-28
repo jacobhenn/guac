@@ -213,8 +213,7 @@ impl Signed for Expr {
     }
 
     fn is_positive(&self) -> bool {
-        // TODO: i really shouldn't have to clone here. fix things.
-        self.clone().coefficient().is_positive()
+        self.coefficient().map(|c| c.is_positive()).unwrap_or(true)
     }
 
     fn is_negative(&self) -> bool {
