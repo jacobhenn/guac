@@ -14,14 +14,16 @@
 /// Provides the `Expr` type and various methods for working with it
 pub mod expr;
 
-// mod args;
+mod args;
 
 mod config;
 
 mod mode;
 
+use crate::args::Args;
 use crate::expr::Expr;
 use anyhow::{Context, Error};
+use args::SubCommand;
 use colored::Colorize;
 use config::Config;
 use crossterm::{
@@ -348,7 +350,7 @@ impl<'a> State<'a> {
     }
 }
 
-fn main() -> Result<(), Error> {
+fn guac_interactive() -> Result<(), Error> {
     let stdout = stdout();
     let stdout = stdout.lock();
 
@@ -369,4 +371,29 @@ fn main() -> Result<(), Error> {
     state.start().context("couldn't start the event loop")?;
 
     Ok(())
+}
+
+fn go() -> Result<(), Error> {
+    let args: Args = argh::from_env();
+
+    match args.subc {
+        Some(SubCommand::Keys(..)) => print!(include_str!("keys.txt")),
+        None => guac_interactive().context("couldn't start guac")?,
+    }
+
+    Ok(())
+}
+
+fn main() {
+    match go() {
+        Ok(_) => (),
+        Err(e) => {
+            terminal::disable_raw_mode().unwrap();
+            let mut chain = e.chain();
+            println!("{}{}", "error: ".red().bold(), chain.next().unwrap());
+            for cause in chain {
+                println!("\ncause: {}", cause);
+            }
+        }
+    }
 }
