@@ -22,21 +22,22 @@ mod mode;
 
 use crate::args::Args;
 use crate::expr::Expr;
-use anyhow::{Context, Error};
+use anyhow::{bail, Context, Error};
 use args::SubCommand;
 use colored::Colorize;
 use config::Config;
 use crossterm::{
-    cursor, event,
+    cursor,
+    event::{self, Event},
     terminal::{self, ClearType},
+    tty::IsTty,
     ExecutableCommand, QueueableCommand,
 };
 use mode::Mode;
 use num::{traits::Pow, BigInt, BigRational, Signed};
 use std::{
     fmt::Display,
-    io::{stdout, StdoutLock, Write},
-    ops::Deref,
+    io::{self, stdin, stdout, BufRead, BufReader, StdoutLock, Write, ErrorKind},
 };
 
 const RADIX: u32 = 10;
@@ -60,6 +61,12 @@ pub enum SoftError {
 
     /// The argument of `log` was not in its domain.
     BadLog,
+
+    /// The command entered in pipe mode could not be run; it returned this IO error.
+    BadCmd(io::Error),
+
+    /// The command entered in pipe mode failed. The first arg is the name of the command. If it printed to stderr, the second arg contains the first line. If not, it is the `ExitStatus` it returned.
+    CmdFailed(String, String),
 }
 
 impl Display for SoftError {
@@ -71,6 +78,14 @@ impl Display for SoftError {
             Self::BadEex => write!(f, "E3: bad eex input"),
             Self::BadTan => write!(f, "E4: tangent of π/2"),
             Self::BadLog => write!(f, "E5: log of n ≤ 0"),
+            Self::BadCmd(e) => {
+                if e.kind() == ErrorKind::NotFound {
+                    write!(f, "E6: unknown command")
+                } else {
+                    write!(f, "E6: bad command: {}", e)
+                }
+            },
+            Self::CmdFailed(s, e) => write!(f, "E7: {}: {}", s, e),
         }
     }
 }
@@ -93,14 +108,6 @@ impl Display for StackItem {
     }
 }
 
-impl Deref for StackItem {
-    type Target = Expr;
-
-    fn deref(&self) -> &Self::Target {
-        &self.expr
-    }
-}
-
 /// The global state of the calculator.
 pub struct State<'a> {
     stack: Vec<StackItem>,
@@ -118,8 +125,10 @@ impl<'a> State<'a> {
     fn render(&mut self) -> Result<(), Error> {
         let (_, cy) = cursor::position().context("couldn't get cursor pos")?;
         self.stdout
-            .queue(terminal::Clear(ClearType::CurrentLine))?
-            .queue(cursor::MoveTo(0, cy))?;
+            .queue(terminal::Clear(ClearType::CurrentLine))
+            .context("couldn't clear the current line")?
+            .queue(cursor::MoveTo(0, cy))
+            .context("couldn't move the cursor to the start of the line")?;
 
         let mut s = String::new();
         for i in 0..self.stack.len() {
@@ -130,7 +139,12 @@ impl<'a> State<'a> {
             }
         }
 
+        if self.mode == Mode::Pipe {
+            s.push_str("|");
+        }
+
         s.push_str(&self.input.to_string());
+
         if self.eex {
             s.push_str(&format!("e{}", self.eex_input));
         }
@@ -144,13 +158,17 @@ impl<'a> State<'a> {
 
         print!("{}", s);
 
-        if self.select_idx.is_some() {
-            self.stdout.queue(cursor::Hide)?;
+        if self.select_idx.is_some() && self.mode != Mode::Pipe {
+            self.stdout
+                .queue(cursor::Hide)
+                .context("couldn't hide cursor")?;
         } else {
-            self.stdout.queue(cursor::Show)?;
+            self.stdout
+                .queue(cursor::Show)
+                .context("couldn't show cursor")?;
         }
 
-        self.stdout.flush()?;
+        self.stdout.flush().context("couldn't flush stdout")?;
 
         Ok(())
     }
@@ -220,31 +238,33 @@ impl<'a> State<'a> {
         F: Fn(Expr, Expr) -> Expr,
         G: Fn(&Expr, &Expr) -> Option<SoftError>,
     {
-        let pushed_input = if self.stack.is_empty() {
+        let did_push_input = if self.stack.is_empty() || self.select_idx.is_some() {
             false
         } else {
             self.push_input()
         };
 
-        if self.stack.len() >= 2 {
-            if let Some(e) = are_in_domain(
-                &self.stack[self.stack.len() - 2],
-                self.stack.last().unwrap(),
-            ) {
+        if self.stack.len() >= 2 && self.select_idx.map_or(true, |i| i > 0) {
+            let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
+
+            if let Some(e) = are_in_domain(&self.stack[idx - 1].expr, &self.stack[idx].expr) {
                 self.err = Some(e);
 
-                if pushed_input {
+                if did_push_input {
                     self.input = self.stack.pop().unwrap().to_string();
                 }
+            } else {
+                let x = self.stack.remove(idx - 1);
+                let y = self.stack.remove(idx - 1);
+                self.stack.insert(
+                    idx - 1,
+                    StackItem {
+                        approx: x.approx || y.approx,
+                        expr: f(x.expr, y.expr),
+                    },
+                );
 
-                return;
-            }
-
-            if let (Some(x), Some(y)) = (self.stack.pop(), self.stack.pop()) {
-                self.stack.push(StackItem {
-                    approx: x.approx || y.approx,
-                    expr: f((*y).clone(), (*x).clone()),
-                });
+                self.select_idx.as_mut().map(|i| *i -= 1);
             }
         }
     }
@@ -254,41 +274,47 @@ impl<'a> State<'a> {
         F: Fn(Expr) -> Expr,
         G: Fn(&Expr) -> Option<SoftError>,
     {
-        let pushed_input = self.push_input();
+        let did_push_input = if self.select_idx.is_some() {
+            false
+        } else {
+            self.push_input()
+        };
 
         if !self.stack.is_empty() {
-            if let Some(e) = is_in_domain(self.stack.last().unwrap()) {
+            let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
+
+            if let Some(e) = is_in_domain(&self.stack[idx].expr) {
                 self.err = Some(e);
 
-                if pushed_input {
+                if did_push_input {
                     self.input = self.stack.pop().unwrap().to_string();
                 }
-
-                return;
-            }
-
-            if let Some(x) = self.stack.pop() {
-                self.stack.push(StackItem {
-                    approx: x.approx,
-                    expr: f((*x).clone()),
-                });
+            } else {
+                let x = self.stack.remove(idx);
+                self.stack.insert(
+                    idx,
+                    StackItem {
+                        approx: x.approx,
+                        expr: f(x.expr),
+                    },
+                );
             }
         }
     }
 
     fn dup(&mut self) {
-        if let Some(l) = self.stack.pop() {
-            self.stack.push(l.clone());
-            self.stack.push(l);
+        if !self.stack.is_empty() {
+            let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
+            let e = self.stack[idx].clone();
+            self.stack.insert(idx + 1, e.clone());
+            self.select_idx.as_mut().map(|i| *i += 1);
         }
     }
 
     fn swap(&mut self) {
-        if self.stack.len() >= 2 {
-            if let (Some(x), Some(y)) = (self.stack.pop(), self.stack.pop()) {
-                self.stack.push(x);
-                self.stack.push(y);
-            }
+        let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
+        if idx > 0 {
+            self.stack.swap(idx - 1, idx);
         }
     }
 
@@ -298,53 +324,99 @@ impl<'a> State<'a> {
         }
     }
 
+    fn cleanup(&mut self) -> Result<(), Error> {
+        self.stdout
+            .execute(cursor::Show)
+            .context("couldn't show cursor")?;
+        terminal::disable_raw_mode().context("couldn't disable raw mode")?;
+
+        println!();
+        self.stdout
+            .execute(terminal::Clear(ClearType::CurrentLine))
+            .context("couldn't clear modeline")?;
+
+        if self.stack.is_empty() && self.input.is_empty() {
+            self.stdout
+                .execute(cursor::MoveUp(1))
+                .context("couldn't move cursor")?;
+        }
+
+        Ok(())
+    }
+
+    fn init_from_stdin(&mut self) {
+        let stdin = stdin();
+
+        if stdin.is_tty() {
+            return;
+        }
+
+        let stdin = BufReader::new(stdin);
+        let mut lines = stdin.lines();
+        let mut idx: usize = 0;
+        let mut bad_idxs = Vec::new();
+        while let Some(Ok(line)) = lines.next() {
+            idx += 1;
+            let line: String = line.chars().filter(|c| !c.is_whitespace()).collect();
+            if let Ok(e) = line.parse::<Expr>() {
+                self.push_expr(e);
+            } else {
+                bad_idxs.push(idx);
+            }
+        }
+
+        if !bad_idxs.is_empty() {
+            eprintln!(
+                "{} couldn't parse stdin (line{} {})",
+                "info:".cyan().bold(),
+                if bad_idxs.len() == 1 { "" } else { "s" },
+                bad_idxs
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
+
     fn start(&mut self) -> Result<(), Error> {
-        let (cx, cy) = cursor::position().context("couldn't get cursor pos")?;
+        let (cx, cy) = cursor::position().context("couldn't get cursor position")?;
         let (.., height) = terminal::size().context("couldn't get terminal size")?;
 
         // If the cursor is at the bottom of the screen, make room for one more line.
         if cy >= height - 1 {
             println!();
-            self.stdout.execute(cursor::MoveTo(cx, cy - 1))?;
+            self.stdout
+                .execute(cursor::MoveTo(cx, cy - 1))
+                .context("couldn't move cursor")?;
         }
 
         loop {
             self.write_modeline().context("couldn't write modeline")?;
+            self.render().context("couldn't render the state")?;
+            self.err = None;
 
-            match event::read()? {
-                event::Event::Key(k) => {
+            // Read the next event from the terminal.
+            match event::read().context("couldn't get next terminal event")? {
+                Event::Key(k) => {
                     if match self.mode {
                         Mode::Normal => self.normal(k),
                         Mode::Constant => self.constant(k),
                         Mode::MassConstant => self.mass_constant(k),
                         Mode::Variable => self.variable(k),
-                    }? {
+                        Mode::Pipe => self.pipe_mode(k),
+                    }
+                    .context("couldn't tick the current mode")?
+                    {
                         break;
                     }
-                }
-                event::Event::Resize(_, _) => {
-                    self.render().context("couldn't render")?;
-                    self.write_modeline().context("couldn't write modeline")?;
                 }
                 _ => (),
             }
         }
 
-        self.stdout
-            .execute(cursor::Show)
-            .context("while cleaning up: couldn't show cursor")?;
-        terminal::disable_raw_mode().context("while cleaning up: couldn't disable raw mode")?;
-
-        println!();
-        self.stdout
-            .execute(terminal::Clear(ClearType::CurrentLine))
-            .context("while cleaning up: couldn't clear modeline")?;
-
-        if self.stack.is_empty() {
-            self.stdout
-                .execute(cursor::MoveUp(1))
-                .context("while cleaning up: couldn't move cursor")?;
-        }
+        self.cleanup()
+            .context("couldn't clean up after event loop")?;
 
         Ok(())
     }
@@ -354,7 +426,11 @@ fn guac_interactive() -> Result<(), Error> {
     let stdout = stdout();
     let stdout = stdout.lock();
 
-    terminal::enable_raw_mode()?;
+    if !stdout.is_tty() {
+        bail!("stdout is not a tty" /*. Use the `!` key to pipe an expression to a command.*/);
+    }
+
+    terminal::enable_raw_mode().context("couldn't enable raw mode")?;
 
     let mut state = State {
         stack: Vec::new(),
@@ -368,6 +444,8 @@ fn guac_interactive() -> Result<(), Error> {
         stdout,
     };
 
+    state.init_from_stdin();
+
     state.start().context("couldn't start the event loop")?;
 
     Ok(())
@@ -378,7 +456,7 @@ fn go() -> Result<(), Error> {
 
     match args.subc {
         Some(SubCommand::Keys(..)) => print!(include_str!("keys.txt")),
-        None => guac_interactive().context("couldn't start guac")?,
+        None => guac_interactive()?,
     }
 
     Ok(())
@@ -390,9 +468,9 @@ fn main() {
         Err(e) => {
             terminal::disable_raw_mode().unwrap();
             let mut chain = e.chain();
-            println!("{}{}", "error: ".red().bold(), chain.next().unwrap());
+            eprintln!("{}{}", "error: ".red().bold(), chain.next().unwrap());
             for cause in chain {
-                println!("\ncause: {}", cause);
+                eprintln!("\ncaused by: {}", cause);
             }
         }
     }

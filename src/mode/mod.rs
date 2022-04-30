@@ -15,11 +15,15 @@ use std::fmt::Display;
 
 mod normal;
 
+mod pipe;
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 pub enum Mode {
     Normal,
     Constant,
     MassConstant,
     Variable,
+    Pipe,
 }
 
 impl Display for Mode {
@@ -29,6 +33,7 @@ impl Display for Mode {
             Self::Constant => write!(f, "enter constant"),
             Self::MassConstant => write!(f, "enter mass constant"),
             Self::Variable => write!(f, "enter variable"),
+            Self::Pipe => write!(f, "enter command"),
         }
     }
 }
@@ -85,6 +90,7 @@ impl<'a> State<'a> {
             Char('p') => self.push_expr(Expr::Const(Const::Pi)),
             Char('e') => self.push_expr(Expr::Const(Const::E)),
             Char('c') => self.push_expr(Expr::Const(Const::C)),
+            Char('g') => self.push_expr(Expr::Const(Const::Gamma)),
             Char('h') => self.push_expr(Expr::Const(Const::H)),
             Char('k') => self.push_expr(Expr::Const(Const::K)),
             Char('m') => {
@@ -103,8 +109,6 @@ impl<'a> State<'a> {
 
         self.mode = Mode::Normal;
 
-        self.render().context("couldn't render")?;
-
         Ok(false)
     }
 
@@ -120,8 +124,6 @@ impl<'a> State<'a> {
         }
 
         self.mode = Mode::Normal;
-
-        self.render().context("couldn't render")?;
 
         Ok(false)
     }
@@ -145,8 +147,6 @@ impl<'a> State<'a> {
             }
             _ => (),
         }
-
-        self.render().context("couldn't render")?;
 
         Ok(false)
     }

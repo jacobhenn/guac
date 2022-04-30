@@ -18,7 +18,6 @@ impl<'a> State<'a> {
     /// Process a keypress in normal mode.
     pub fn normal(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
         self.write_modeline().context("couldn't write modeline")?;
-        self.err = None;
 
         match code {
             KeyCode::Char(c)
@@ -34,7 +33,14 @@ impl<'a> State<'a> {
             KeyCode::Char('q') | KeyCode::Esc => return Ok(true),
             KeyCode::Char(';') => self.toggle_approx(),
             KeyCode::Enter | KeyCode::Char(' ') => {
-                self.push_input();
+                if self.select_idx.is_some() {
+                    self.dup();
+                } else {
+                    let did_push_input = self.push_input();
+                    if !did_push_input {
+                        self.dup();
+                    }
+                }
             }
             KeyCode::Char('d') => {
                 self.drop();
@@ -77,7 +83,6 @@ impl<'a> State<'a> {
             KeyCode::Char('a') => {
                 self.select_idx = None;
             }
-            KeyCode::Char('\t') => self.dup(),
             KeyCode::Char('+') => self.apply_binary(|x, y| x + y, |_, _| None),
             KeyCode::Char('-') => self.apply_binary(|x, y| x - y, |_, _| None),
             KeyCode::Char('*') => self.apply_binary(|x, y| x * y, |_, _| None),
@@ -100,7 +105,7 @@ impl<'a> State<'a> {
                 self.apply_unary(Inv::inv, |x| x.is_zero().then(|| SoftError::DivideByZero));
             }
             KeyCode::Char('~') => self.apply_unary(Neg::neg, |_| None),
-            KeyCode::Char('|') => self.apply_unary(|x| x.abs(), |_| None),
+            KeyCode::Char('\\') => self.apply_unary(|x| x.abs(), |_| None),
             KeyCode::Char('s') => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(|x| x.generic_sin(angle_measure), |_| None);
@@ -125,8 +130,17 @@ impl<'a> State<'a> {
                 self.input.clear();
                 self.eex_input.clear();
                 self.eex = false;
+                self.select_idx = None;
                 self.mode = Mode::Variable;
             }
+            KeyCode::Char('|') => {
+                self.push_input();
+                if !self.stack.is_empty() {
+                    self.err = None;
+                    self.input.clear();
+                    self.mode = Mode::Pipe
+                }
+            },
             KeyCode::Char('e') => self.eex = true,
             KeyCode::Char('<') => {
                 if let Some(i) = &mut self.select_idx {
@@ -134,9 +148,12 @@ impl<'a> State<'a> {
                         self.stack.swap(*i, *i - 1);
                         *i -= 1;
                     }
-                } else if self.push_input() {
-                    self.swap();
-                    self.select_idx = Some(self.stack.len() - 2);
+                } else {
+                    let did_push_input = self.push_input();
+                    if did_push_input {
+                        self.swap();
+                        self.select_idx = Some(self.stack.len() - 2);
+                    }
                 }
             }
             KeyCode::Char('>') => {
@@ -154,8 +171,6 @@ impl<'a> State<'a> {
             KeyCode::Char('R') => self.apply_unary(|x| x.pow(2.into()), |_| None),
             _ => (),
         }
-
-        self.render().context("couldn't render")?;
 
         Ok(false)
     }

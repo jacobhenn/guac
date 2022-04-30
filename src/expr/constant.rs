@@ -1,7 +1,7 @@
 use std::{fmt::{Display, self, Formatter}, f64::consts};
 
 /// Numerous common mathematical and physical constants.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Const {
     /// π ≈ 3.142: The ratio of a circle's circumfrence to its diameter.
     Pi,

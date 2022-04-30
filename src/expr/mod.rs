@@ -30,7 +30,7 @@ pub mod cast;
 // pub mod unit;
 
 /// A general-purpose type to store algebraic expressions.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     /// A rational number.
     Num(BigRational),

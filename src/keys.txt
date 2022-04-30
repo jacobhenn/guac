@@ -11,6 +11,7 @@
 - /: divide
 - `: reciprocal
 - ~: opposite
+- \: absolute value
 - d: drop the selected expression, or the topmost expression if the input is selected
 - ^: exponentiate
 - l: natural log
@@ -29,6 +30,10 @@
 - <: move selected expression to the left
 - right: swap the selected expression (or the topmost one) with the expression to its left
 - a: cancel selection and jump to input
+- `|`: enter **pipe** mode
+    - `any char`: type a command (to be executed directly, **not** through your `$SHELL`)
+    - `enter`: pipe the selected expression (or the topmost one) to the entered command
+    - `esc`: cancel
 - v: enter variable mode
     - [A-Za-z]: type in a custom variable name
     - esc: cancel
@@ -36,6 +41,7 @@
     - p: pi
     - P: tau
     - e: e
+    - g: euler-mascheroni constant
     - c: speed of light (m·s⁻¹)
     - G: gravitational constant (m³·kg⁻¹·s⁻²)
     - h: planck constant (J·Hz⁻¹)
