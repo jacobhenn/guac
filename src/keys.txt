@@ -30,10 +30,10 @@
 - <: move selected expression to the left
 - right: swap the selected expression (or the topmost one) with the expression to its left
 - a: cancel selection and jump to input
-- `|`: enter **pipe** mode
-    - `any char`: type a command (to be executed directly, **not** through your `$SHELL`)
-    - `enter`: pipe the selected expression (or the topmost one) to the entered command
-    - `esc`: cancel
+- |: enter pipe mode
+    - any char: type a command (to be executed directly, **not** through your $SHELL)
+    - enter: pipe the selected expression (or the topmost one) to the entered command
+    - esc: cancel
 - v: enter variable mode
     - [A-Za-z]: type in a custom variable name
     - esc: cancel

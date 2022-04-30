@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use crate::config::AngleMeasure;
 
 use self::constant::Const;
-use num::{BigInt, BigRational, One, Zero};
+use num::{BigRational, One, Zero};
 
 /// Implementation of `Add` for `Expr`, along with helper types and functions for that purpose.
 pub mod add;
@@ -95,6 +95,7 @@ impl Expr {
     }
 
     /// Return the contents of this expression if it's a Num; if not, return None.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn into_num(self) -> Option<BigRational> {
         match self {
             Self::Num(n) => Some(n),
@@ -153,13 +154,5 @@ impl Expr {
             }
             _ => (),
         }
-    }
-
-    /// If something can be an integer, it can be an Expr.
-    pub fn from_int<I>(i: I) -> Self
-    where
-        I: Into<i128>,
-    {
-        Self::Num(BigRational::from(BigInt::from(i.into())))
     }
 }

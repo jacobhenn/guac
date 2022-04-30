@@ -50,8 +50,8 @@ If you won't be developing `guac`, run `cargo clean` after installing to save di
 - `c`: **c**osine
 - `t`: **t**angent
 - `x`: push **x**
-- `h`: move selection to the left (by analogy to Vim's `h`)
-- `l`: move selection to the right (by analogy to Vim's `l`)
+- `h`: select to the left (by analogy to Vim's `h`)
+- `l`: select to the right (by analogy to Vim's `l`)
 - `>`: move selected expression to the right (by analogy to Vim's `>>`)
 - `<`: move selected expression to the left (by analogy to Vim's `<<`)
 - `right`: swap the selected expression (or the topmost one) with the expression to its left

@@ -11,6 +11,10 @@ use super::Mode;
 
 impl<'a> State<'a> {
     /// Execute the command entered in pipe mode.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic and/or do weird things if not called in pipe mode.
     pub fn execute_pipe(&mut self) -> Result<()> {
         let mut words = self.input.split_whitespace();
         if let Some(word) = words.next() {
@@ -19,7 +23,7 @@ impl<'a> State<'a> {
             cmd.stdout(Stdio::null());
             cmd.stderr(Stdio::piped());
 
-            while let Some(word) = words.next() {
+            for word in words {
                 cmd.arg(word);
             }
 
@@ -46,7 +50,7 @@ impl<'a> State<'a> {
                             stderr
                                 .lines()
                                 .next()
-                                .unwrap_or(Ok(status.to_string()))
+                                .unwrap_or_else(|| Ok(status.to_string()))
                                 .context("failed to read child stderr")?,
                         ));
                     }
@@ -68,7 +72,7 @@ impl<'a> State<'a> {
                 self.execute_pipe().context("couldn't execute command")?;
 
                 if self.err.is_none() {
-                    self.input.clear()
+                    self.input.clear();
                 }
 
                 self.mode = Mode::Normal;

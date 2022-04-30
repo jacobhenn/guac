@@ -119,8 +119,9 @@ impl<'a> State<'a> {
                 self.apply_unary(
                     |x| x.generic_tan(angle_measure),
                     |x| {
-                        (x.clone().into_turns(angle_measure) % (1, 2).into() == (1, 4).into())
-                            .then(|| SoftError::BadTan)
+                        (x.clone().into_turns(angle_measure) % Expr::from((1, 2))
+                            == Expr::from((1, 4)))
+                        .then(|| SoftError::BadTan)
                     },
                 );
             }
@@ -138,9 +139,9 @@ impl<'a> State<'a> {
                 if !self.stack.is_empty() {
                     self.err = None;
                     self.input.clear();
-                    self.mode = Mode::Pipe
+                    self.mode = Mode::Pipe;
                 }
-            },
+            }
             KeyCode::Char('e') => self.eex = true,
             KeyCode::Char('<') => {
                 if let Some(i) = &mut self.select_idx {

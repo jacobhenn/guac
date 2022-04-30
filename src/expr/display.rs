@@ -58,7 +58,7 @@ impl Expr {
     pub fn has_pos_exp(&self) -> bool {
         match self {
             Self::Num(n) => !n.numer().is_one(),
-            other => other.exponent().map(|e| e.is_positive()).unwrap_or(true)
+            other => other.exponent().map_or(true, Signed::is_positive),
         }
     }
 }
@@ -103,9 +103,9 @@ impl Display for Expr {
                 Ok(())
             }
             Self::Power(b, e) => {
-                if **e == (1, 2).into() {
+                if **e == Self::from((1, 2)) {
                     write!(f, "sqrt({})", b)
-                } else if **e == (1, 3).into() {
+                } else if **e == Self::from((1, 3)) {
                     write!(f, "cbrt({})", b)
                 } else {
                     write!(f, "{}^{}", self.format_child(b), self.format_child(e))

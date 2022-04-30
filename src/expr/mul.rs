@@ -30,7 +30,7 @@ impl Expr {
 
     /// Return the base of this expression. e.g., x^2 -> x, x+5 -> x+5
     // TODO: make this work correctly with fractions
-    pub fn base(&self) -> &Self {
+    pub const fn base(&self) -> &Self {
         match self {
             // Self::Num(n) if n.numer().is_one() => Self::Num(n.denom().into()),
             Self::Power(b, ..) => b,
@@ -40,7 +40,7 @@ impl Expr {
 
     /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
     // TODO: make this work correctly with fractions
-    pub fn exponent(&self) -> Option<&Self> {
+    pub const fn exponent(&self) -> Option<&Self> {
         match self {
             // Self::Num(n) if n.numer().is_one() => Self::from(-1),
             Self::Power(_, e) => Some(e),
@@ -60,6 +60,7 @@ impl Expr {
 
     /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
     // TODO: make this work correctly with fractions
+    #[must_use]
     pub fn into_exponent(self) -> Self {
         match self {
             // Self::Num(n) if n.numer().is_one() => Self::from(-1),
@@ -71,7 +72,7 @@ impl Expr {
     /// Multiply two expressions. **Their exponents must be like terms, or this will be incorrect**.
     pub fn combine_like_factors(&mut self, rhs: Self) {
         if let Some(e) = self.exponent_mut() {
-            e.combine_like_terms(rhs.into_exponent())
+            e.combine_like_terms(rhs.into_exponent());
         } else {
             *self = self.clone().pow(Self::one() + rhs.into_exponent());
         }
@@ -111,7 +112,7 @@ impl Mul for Expr {
 impl MulAssign for Expr {
     fn mul_assign(&mut self, rhs: Self) {
         let self_factors = self.factors();
-        let (like, unlike): (Vec<Expr>, Vec<Expr>) = rhs
+        let (like, unlike): (Vec<Self>, Vec<Self>) = rhs
             .into_terms()
             .into_iter()
             .partition(|t| self_factors.iter().any(|st| t.is_like_factor(st)));

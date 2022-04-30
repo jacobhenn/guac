@@ -2,11 +2,11 @@ use super::Expr;
 use num::{
     rational::ParseRatioError,
     traits::{Inv, Pow},
-    BigInt, BigRational, Num, One, Signed, Zero,
+    BigRational, Num, One, Signed, Zero,
 };
 use std::{
     iter::{Product, Sum},
-    ops::{Div, Neg, Rem, Sub},
+    ops::{Div, DivAssign, Neg, Rem, RemAssign, Sub, SubAssign},
 };
 
 impl Expr {
@@ -27,7 +27,7 @@ impl Expr {
     /// Take the square root of this expression.
     #[must_use]
     pub fn sqrt(self) -> Self {
-        self.pow((1, 2).into())
+        self.pow(Self::from((1, 2)))
     }
 }
 
@@ -67,7 +67,13 @@ impl Sub for Expr {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        self + (rhs * Self::Num(BigRational::from(BigInt::from(-1))))
+        self + rhs * Self::from_int(-1)
+    }
+}
+
+impl SubAssign for Expr {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self += rhs * Self::from_int(-1);
     }
 }
 
@@ -75,7 +81,13 @@ impl Div for Expr {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        self * (rhs.pow(Self::Num(BigRational::from(BigInt::from(-1)))))
+        self * rhs.pow(Self::from_int(-1))
+    }
+}
+
+impl DivAssign for Expr {
+    fn div_assign(&mut self, rhs: Self) {
+        *self *= rhs.pow(Self::from_int(-1));
     }
 }
 
@@ -156,6 +168,12 @@ impl Rem for Expr {
     }
 }
 
+impl RemAssign for Expr {
+    fn rem_assign(&mut self, rhs: Self) {
+        *self = self.clone() % rhs;
+    }
+}
+
 impl Product for Expr {
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(One::one(), |acc, i| acc * i)
@@ -213,7 +231,7 @@ impl Signed for Expr {
     }
 
     fn is_positive(&self) -> bool {
-        self.coefficient().map(|c| c.is_positive()).unwrap_or(true)
+        self.coefficient().map_or(true, Signed::is_positive)
     }
 
     fn is_negative(&self) -> bool {

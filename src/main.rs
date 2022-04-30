@@ -37,7 +37,7 @@ use mode::Mode;
 use num::{traits::Pow, BigInt, BigRational, Signed};
 use std::{
     fmt::Display,
-    io::{self, stdin, stdout, BufRead, BufReader, StdoutLock, Write, ErrorKind},
+    io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write},
 };
 
 const RADIX: u32 = 10;
@@ -84,7 +84,7 @@ impl Display for SoftError {
                 } else {
                     write!(f, "E6: bad command: {}", e)
                 }
-            },
+            }
             Self::CmdFailed(s, e) => write!(f, "E7: {}: {}", s, e),
         }
     }
@@ -140,7 +140,7 @@ impl<'a> State<'a> {
         }
 
         if self.mode == Mode::Pipe {
-            s.push_str("|");
+            s.push('|');
         }
 
         s.push_str(&self.input.to_string());
@@ -264,7 +264,9 @@ impl<'a> State<'a> {
                     },
                 );
 
-                self.select_idx.as_mut().map(|i| *i -= 1);
+                if let Some(i) = self.select_idx.as_mut() {
+                    *i -= 1;
+                }
             }
         }
     }
@@ -306,8 +308,10 @@ impl<'a> State<'a> {
         if !self.stack.is_empty() {
             let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
             let e = self.stack[idx].clone();
-            self.stack.insert(idx + 1, e.clone());
-            self.select_idx.as_mut().map(|i| *i += 1);
+            self.stack.insert(idx + 1, e);
+            if let Some(i) = self.select_idx.as_mut() {
+                *i += 1;
+            }
         }
     }
 
@@ -372,10 +376,10 @@ impl<'a> State<'a> {
                 if bad_idxs.len() == 1 { "" } else { "s" },
                 bad_idxs
                     .iter()
-                    .map(|i| i.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ")
-            )
+            );
         }
     }
 
@@ -397,21 +401,18 @@ impl<'a> State<'a> {
             self.err = None;
 
             // Read the next event from the terminal.
-            match event::read().context("couldn't get next terminal event")? {
-                Event::Key(k) => {
-                    if match self.mode {
-                        Mode::Normal => self.normal(k),
-                        Mode::Constant => self.constant(k),
-                        Mode::MassConstant => self.mass_constant(k),
-                        Mode::Variable => self.variable(k),
-                        Mode::Pipe => self.pipe_mode(k),
-                    }
-                    .context("couldn't tick the current mode")?
-                    {
-                        break;
-                    }
+            if let Event::Key(k) = event::read().context("couldn't get next terminal event")? {
+                if match self.mode {
+                    Mode::Normal => self.normal(k),
+                    Mode::Constant => self.constant(k),
+                    Mode::MassConstant => self.mass_constant(k),
+                    Mode::Variable => self.variable(k),
+                    Mode::Pipe => self.pipe_mode(k),
                 }
-                _ => (),
+                .context("couldn't tick the current mode")?
+                {
+                    break;
+                }
             }
         }
 
@@ -427,7 +428,7 @@ fn guac_interactive() -> Result<(), Error> {
     let stdout = stdout.lock();
 
     if !stdout.is_tty() {
-        bail!("stdout is not a tty" /*. Use the `!` key to pipe an expression to a command.*/);
+        bail!("stdout is not a tty. use the `|` key to pipe an expression.");
     }
 
     terminal::enable_raw_mode().context("couldn't enable raw mode")?;

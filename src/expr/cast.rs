@@ -6,6 +6,16 @@ use std::{
     str::FromStr,
 };
 
+impl Expr {
+    /// If something can be an integer, it can be an Expr.
+    pub fn from_int<I>(i: I) -> Self
+    where
+        I: Into<i128>,
+    {
+        Self::Num(BigRational::from(BigInt::from(i.into())))
+    }
+}
+
 impl TryFrom<Expr> for f64 {
     type Error = ();
 
@@ -41,7 +51,7 @@ impl From<i128> for Expr {
 
 impl From<(i128, i128)> for Expr {
     fn from((n, d): (i128, i128)) -> Self {
-        Self::Num((n.into(), d.into()).into())
+        Self::Num(BigRational::from((BigInt::from(n), BigInt::from(d))))
     }
 }
 

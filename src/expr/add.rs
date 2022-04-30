@@ -65,8 +65,8 @@ impl Expr {
             self.push_factor(Self::Num(c + BigRational::one()));
         } else {
             match self {
-                Self::Product(fs) => fs.push(Expr::from_int(2)),
-                other => *other = Self::Product(vec![Expr::from_int(2), other.clone()]),
+                Self::Product(fs) => fs.push(Self::from_int(2)),
+                other => *other = Self::Product(vec![Self::from_int(2), other.clone()]),
             }
         }
     }
@@ -92,7 +92,7 @@ impl Add for Expr {
 impl AddAssign for Expr {
     fn add_assign(&mut self, rhs: Self) {
         let self_terms = self.terms();
-        let (like, unlike): (Vec<Expr>, Vec<Expr>) = rhs
+        let (like, unlike): (Vec<Self>, Vec<Self>) = rhs
             .into_terms()
             .into_iter()
             .partition(|t| self_terms.iter().any(|st| t.is_like_term(st)));

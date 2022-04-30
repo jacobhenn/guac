@@ -51,7 +51,7 @@ impl Expr {
     pub fn generic_sin(self, measure: AngleMeasure) -> Self {
         let turns = self.clone().into_turns(measure) % Self::one();
 
-        let onehalf: Self = (1, 2).into();
+        let onehalf = Self::from((1, 2));
         if turns.is_negative() {
             return self.neg().generic_sin(measure).neg();
         } else if turns >= onehalf {
@@ -59,7 +59,7 @@ impl Expr {
                 .turns_to(measure)
                 .generic_sin(measure)
                 .neg();
-        } else if turns > (1, 4).into() {
+        } else if turns > Self::from((1, 4)) {
             return (onehalf - turns).turns_to(measure).generic_sin(measure);
         }
 
@@ -69,7 +69,7 @@ impl Expr {
                 (Ok(1), Ok(4)) => Self::one(),
                 (Ok(1), Ok(8)) => Self::from(2).pow(Self::from((1, 2)).neg()),
                 (Ok(1), Ok(6)) => Self::from(3).sqrt() / Self::from(2),
-                (Ok(1), Ok(12)) => (1, 2).into(),
+                (Ok(1), Ok(12)) => Self::from((1, 2)),
                 _ => Self::Sin(Box::new(self), measure),
             },
             _ => Self::Sin(Box::new(self), measure),
@@ -81,12 +81,12 @@ impl Expr {
     pub fn generic_cos(self, measure: AngleMeasure) -> Self {
         let turns = self.clone().into_turns(measure) % Self::one();
 
-        let onehalf: Self = (1, 2).into();
+        let onehalf = Self::from((1, 2));
         if turns.is_negative() {
             return self.neg().generic_cos(measure);
         } else if turns >= onehalf {
             return (Self::one() - turns).turns_to(measure).generic_cos(measure);
-        } else if turns > (1, 4).into() {
+        } else if turns > Self::from((1, 4)) {
             return (onehalf - turns)
                 .turns_to(measure)
                 .generic_cos(measure)
@@ -98,7 +98,7 @@ impl Expr {
                 (Ok(0), ..) => Self::one(),
                 (Ok(1), Ok(4)) => Self::zero(),
                 (Ok(1), Ok(8)) => Self::from(2).pow(Self::from((1, 2)).neg()),
-                (Ok(1), Ok(6)) => (1, 2).into(),
+                (Ok(1), Ok(6)) => Self::from((1, 2)),
                 (Ok(1), Ok(12)) => Self::from(3).sqrt() / Self::from(2),
                 _ => Self::Cos(Box::new(self), measure),
             },
@@ -109,12 +109,12 @@ impl Expr {
     /// Take the tangent of this expression as an angle in `measure`.
     #[must_use]
     pub fn generic_tan(self, measure: AngleMeasure) -> Self {
-        let onehalf: Self = (1, 2).into();
+        let onehalf = Self::from((1, 2));
 
         let turns = self.clone().into_turns(measure) % onehalf.clone();
         if turns.is_negative() {
             return self.neg().generic_tan(measure);
-        } else if turns > (1, 4).into() {
+        } else if turns > Self::from((1, 4)) {
             return (onehalf - turns)
                 .turns_to(measure)
                 .generic_tan(measure)
