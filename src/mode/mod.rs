@@ -56,6 +56,10 @@ impl<'a> State<'a> {
             self.mode,
         );
 
+        if line.len() > width as usize {
+            return Ok(());
+        }
+
         let colored_line = format!(
             "{} {} {} {}",
             self.err

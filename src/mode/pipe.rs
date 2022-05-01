@@ -34,7 +34,7 @@ impl<'a> State<'a> {
                     let expr = if let Some(i) = self.select_idx {
                         self.stack[i].expr.clone()
                     } else {
-                        self.stack.last().unwrap().clone().expr
+                        self.stack.last().unwrap().expr.clone()
                     };
 
                     stdin
@@ -73,9 +73,8 @@ impl<'a> State<'a> {
 
                 if self.err.is_none() {
                     self.input.clear();
+                    self.mode = Mode::Normal;
                 }
-
-                self.mode = Mode::Normal;
             }
             KeyCode::Backspace => {
                 if self.input.is_empty() {

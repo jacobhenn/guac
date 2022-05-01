@@ -11,9 +11,15 @@ pub struct Args {
 #[argh(subcommand)]
 pub enum SubCommand {
     Keys(Keys),
+    Anyway(Anyway),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// print a list of keybindings and their actions
 #[argh(subcommand, name = "keys")]
 pub struct Keys {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// disregard inconveniences
+#[argh(subcommand, name = "anyway")]
+pub struct Anyway {}

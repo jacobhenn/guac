@@ -1,5 +1,5 @@
 use super::Expr;
-use num::{traits::Pow, One};
+use num::{traits::Pow, One, BigRational};
 use std::ops::{Mul, MulAssign};
 
 impl Expr {
@@ -29,41 +29,36 @@ impl Expr {
     }
 
     /// Return the base of this expression. e.g., x^2 -> x, x+5 -> x+5
-    // TODO: make this work correctly with fractions
-    pub const fn base(&self) -> &Self {
+    #[must_use]
+    pub fn into_base(self) -> Self {
         match self {
-            // Self::Num(n) if n.numer().is_one() => Self::Num(n.denom().into()),
-            Self::Power(b, ..) => b,
+            Self::Num(n) if n.numer().is_one() => Self::Num(BigRational::from(n.denom().clone())),
+            Self::Power(b, ..) => *b,
             other => other,
         }
     }
 
-    /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
-    // TODO: make this work correctly with fractions
+    /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> None
     pub const fn exponent(&self) -> Option<&Self> {
         match self {
-            // Self::Num(n) if n.numer().is_one() => Self::from(-1),
             Self::Power(_, e) => Some(e),
             _ => None,
         }
     }
 
     /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
-    // TODO: make this work correctly with fractions
     pub fn exponent_mut(&mut self) -> Option<&mut Self> {
         match self {
-            // Self::Num(n) if n.numer().is_one() => Self::from(-1),
             Self::Power(_, e) => Some(e),
             _ => None,
         }
     }
 
     /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> 1
-    // TODO: make this work correctly with fractions
     #[must_use]
     pub fn into_exponent(self) -> Self {
         match self {
-            // Self::Num(n) if n.numer().is_one() => Self::from(-1),
+            Self::Num(n) if n.numer().is_one() => Self::from(-1),
             Self::Power(_, e) => *e,
             _ => One::one(),
         }
@@ -80,7 +75,7 @@ impl Expr {
 
     /// Do these two terms have the same base and like terms for exponents?
     pub fn is_like_factor(&self, rhs: &Self) -> bool {
-        self.base() == rhs.base()
+        self.clone().into_base() == rhs.clone().into_base()
             && self
                 .exponent()
                 .unwrap_or(&One::one())

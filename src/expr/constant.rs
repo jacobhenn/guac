@@ -1,4 +1,7 @@
-use std::{fmt::{Display, self, Formatter}, f64::consts};
+use std::{
+    f64::consts,
+    fmt::{self, Display, Formatter},
+};
 
 /// Numerous common mathematical and physical constants.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -67,6 +67,10 @@ pub enum SoftError {
 
     /// The command entered in pipe mode failed. The first arg is the name of the command. If it printed to stderr, the second arg contains the first line. If not, it is the `ExitStatus` it returned.
     CmdFailed(String, String),
+
+    /// This error should never be thrown in a release. It's just used to debug certain things.
+    #[cfg(debug_assertions)]
+    Debug(String),
 }
 
 impl Display for SoftError {
@@ -82,19 +86,22 @@ impl Display for SoftError {
                 if e.kind() == ErrorKind::NotFound {
                     write!(f, "E6: unknown command")
                 } else {
-                    write!(f, "E6: bad command: {}", e)
+                    write!(f, "E6: bad command: {e}")
                 }
             }
-            Self::CmdFailed(s, e) => write!(f, "E7: {}: {}", s, e),
+            Self::CmdFailed(s, e) => write!(f, "E7: {s}: {e}"),
+            #[cfg(debug_assertions)]
+            Self::Debug(s) => write!(f, "DEBUG: {s}"),
         }
     }
 }
 
 /// An expression, along with other data necessary for displaying it but not for doing math with it.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StackItem {
     approx: bool,
     expr: Expr,
+    expr_str: Option<String>,
 }
 
 impl Display for StackItem {
@@ -111,6 +118,8 @@ impl Display for StackItem {
 /// The global state of the calculator.
 pub struct State<'a> {
     stack: Vec<StackItem>,
+    // history: Vec<Vec<StackItem>>,
+    // future: Vec<Vec<StackItem>>,
     input: String,
     eex_input: String,
     eex: bool,
@@ -131,29 +140,43 @@ impl<'a> State<'a> {
             .context("couldn't move the cursor to the start of the line")?;
 
         let mut s = String::new();
+        let mut len: usize = 0;
+        let mut selected_pos = None;
         for i in 0..self.stack.len() {
+            let stack_item = &mut self.stack[i];
+            let expr_str = stack_item.expr_str.get_or_insert(stack_item.to_string());
+
             if Some(i) == self.select_idx {
-                s.push_str(&format!("{} ", self.stack[i].to_string().underline()));
+                selected_pos = Some(len + expr_str.len() / 2);
+                s.push_str(&format!("{} ", expr_str.underline()));
             } else {
-                s.push_str(&format!("{} ", self.stack[i]));
+                s.push_str(&format!("{expr_str} "));
             }
+
+            len += expr_str.len() + 1;
         }
 
         if self.mode == Mode::Pipe {
             s.push('|');
+            len += 1;
         }
 
-        s.push_str(&self.input.to_string());
+        let input = self.input.to_string();
+        len += input.len();
+        s.push_str(&input);
 
-        if self.eex {
-            s.push_str(&format!("e{}", self.eex_input));
-        }
+        let width = terminal::size().context("couldn't get terminal size")?.0 as usize;
 
-        let (width, ..) = terminal::size().context("couldn't get terminal size")?;
-        let width = width - 1;
-
-        if s.len() > width as usize {
-            s.replace_range(0..s.len().saturating_sub(width as usize), "");
+        let garbage = s.len().saturating_sub(len);
+        if len > (width - 1) {
+            if let Some(pos) = selected_pos {
+                let half_width = width / 2;
+                let left = pos.saturating_sub(half_width);
+                let right = (left + garbage + width - 1).clamp(0, s.len());
+                s = s[left..right].to_string();
+            } else {
+                s.replace_range(0..len.saturating_sub(width - 1), "");
+            }
         }
 
         print!("{}", s);
@@ -177,6 +200,7 @@ impl<'a> State<'a> {
         self.stack.push(StackItem {
             approx: false,
             expr,
+            expr_str: None,
         });
     }
 
@@ -201,6 +225,7 @@ impl<'a> State<'a> {
                 self.stack.push(StackItem {
                     approx: self.input.contains('.') || eex.is_negative(),
                     expr: expr * Expr::from_int(RADIX).pow(Expr::Num(BigRational::from(eex))),
+                    expr_str: None,
                 });
                 self.eex = false;
                 true
@@ -212,6 +237,7 @@ impl<'a> State<'a> {
                 self.stack.push(StackItem {
                     approx: self.input.contains('.'),
                     expr,
+                    expr_str: None,
                 });
                 true
             }
@@ -228,6 +254,7 @@ impl<'a> State<'a> {
             self.stack.push(StackItem {
                 approx: false,
                 expr: Expr::Var(self.input.clone()),
+                expr_str: None,
             });
             self.input.clear();
         }
@@ -261,6 +288,7 @@ impl<'a> State<'a> {
                     StackItem {
                         approx: x.approx || y.approx,
                         expr: f(x.expr, y.expr),
+                        expr_str: None,
                     },
                 );
 
@@ -298,6 +326,7 @@ impl<'a> State<'a> {
                     StackItem {
                         approx: x.approx,
                         expr: f(x.expr),
+                        expr_str: None,
                     },
                 );
             }
@@ -423,18 +452,20 @@ impl<'a> State<'a> {
     }
 }
 
-fn guac_interactive() -> Result<(), Error> {
+fn guac_interactive(anyway: bool) -> Result<(), Error> {
     let stdout = stdout();
     let stdout = stdout.lock();
 
-    if !stdout.is_tty() {
-        bail!("stdout is not a tty. use the `|` key to pipe an expression.");
+    if !anyway && !stdout.is_tty() {
+        bail!("stdout is not a tty. if you want to pipe an expression out of `guac`, see the `|` entry in `guac keys`. if you know what you're doing, use `guac anyway` to run anyway.");
     }
 
     terminal::enable_raw_mode().context("couldn't enable raw mode")?;
 
     let mut state = State {
         stack: Vec::new(),
+        // history: Vec::new(),
+        // future: Vec::new(),
         input: String::new(),
         eex_input: String::new(),
         eex: false,
@@ -457,7 +488,14 @@ fn go() -> Result<(), Error> {
 
     match args.subc {
         Some(SubCommand::Keys(..)) => print!(include_str!("keys.txt")),
-        None => guac_interactive()?,
+        Some(SubCommand::Anyway(..)) => guac_interactive(true)?,
+        None => {
+            if terminal::size().context("couldn't get terminal size")?.0 < 15 {
+                bail!("terminal is too small. use `guac anyway` to run anyway.")
+            }
+
+            guac_interactive(false)?;
+        }
     }
 
     Ok(())

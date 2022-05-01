@@ -26,7 +26,7 @@ impl<'a> State<'a> {
                 self.eex_input.push(c);
             }
             KeyCode::Char(c)
-                if self.select_idx.is_none() && !self.eex && (c.is_digit(RADIX) || c == '.') =>
+                if self.select_idx.is_none() && (c.is_digit(RADIX) || c == '.') =>
             {
                 self.input.push(c);
             }
@@ -143,6 +143,8 @@ impl<'a> State<'a> {
                 }
             }
             KeyCode::Char('e') => self.eex = true,
+            // KeyCode::Char('u') => self.undo(),
+            // KeyCode::Char('U') => self.redo(),
             KeyCode::Char('<') => {
                 if let Some(i) = &mut self.select_idx {
                     if *i != 0 {
