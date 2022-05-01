@@ -101,25 +101,35 @@ impl Display for SoftError {
 pub struct StackItem {
     approx: bool,
     expr: Expr,
-    expr_str: Option<String>,
+    exact_str: String,
+    approx_str: String,
+}
+
+impl StackItem {
+    /// Create a new StackItem and cache its rendered strings.
+    pub fn new(approx: bool, expr: Expr) -> Self {
+        Self {
+            approx,
+            expr: expr.clone(),
+            exact_str: expr.clone().to_string(),
+            approx_str: expr.display_approx(),
+        }
+    }
 }
 
 impl Display for StackItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.approx {
-            if let Ok(n) = self.expr.clone().to_f64() {
-                return write!(f, "{:.3}", n);
-            }
+            write!(f, "{}", self.approx_str)
+        } else {
+            write!(f, "{}", self.exact_str)
         }
-        write!(f, "{}", self.expr)
     }
 }
 
 /// The global state of the calculator.
 pub struct State<'a> {
     stack: Vec<StackItem>,
-    // history: Vec<Vec<StackItem>>,
-    // future: Vec<Vec<StackItem>>,
     input: String,
     eex_input: String,
     eex: bool,
@@ -144,7 +154,7 @@ impl<'a> State<'a> {
         let mut selected_pos = None;
         for i in 0..self.stack.len() {
             let stack_item = &mut self.stack[i];
-            let expr_str = stack_item.expr_str.get_or_insert(stack_item.to_string());
+            let expr_str = stack_item.to_string();
 
             if Some(i) == self.select_idx {
                 selected_pos = Some(len + expr_str.len() / 2);
@@ -165,11 +175,18 @@ impl<'a> State<'a> {
         len += input.len();
         s.push_str(&input);
 
+        if self.eex {
+            let eex_input = self.eex_input.to_string();
+            len += eex_input.len() + 1;
+            s.push('ᴇ');
+            s.push_str(&eex_input);
+        }
+
         let width = terminal::size().context("couldn't get terminal size")?.0 as usize;
 
-        let garbage = s.len().saturating_sub(len);
         if len > (width - 1) {
             if let Some(pos) = selected_pos {
+                let garbage = s.len().saturating_sub(len);
                 let half_width = width / 2;
                 let left = pos.saturating_sub(half_width);
                 let right = (left + garbage + width - 1).clamp(0, s.len());
@@ -197,11 +214,7 @@ impl<'a> State<'a> {
     }
 
     fn push_expr(&mut self, expr: Expr) {
-        self.stack.push(StackItem {
-            approx: false,
-            expr,
-            expr_str: None,
-        });
+        self.stack.push(StackItem::new(false, expr));
     }
 
     fn drop(&mut self) {
@@ -222,11 +235,10 @@ impl<'a> State<'a> {
             if let Ok(eex) = self.eex_input.parse::<BigInt>() {
                 self.input.clear();
                 self.eex_input.clear();
-                self.stack.push(StackItem {
-                    approx: self.input.contains('.') || eex.is_negative(),
-                    expr: expr * Expr::from_int(RADIX).pow(Expr::Num(BigRational::from(eex))),
-                    expr_str: None,
-                });
+                self.stack.push(StackItem::new(
+                    self.input.contains('.') || eex.is_negative(),
+                    expr * Expr::from_int(RADIX).pow(Expr::Num(BigRational::from(eex))),
+                ));
                 self.eex = false;
                 true
             } else if self.eex {
@@ -234,11 +246,8 @@ impl<'a> State<'a> {
                 false
             } else {
                 self.input.clear();
-                self.stack.push(StackItem {
-                    approx: self.input.contains('.'),
-                    expr,
-                    expr_str: None,
-                });
+                self.stack
+                    .push(StackItem::new(self.input.contains('.'), expr));
                 true
             }
         } else if !self.input.is_empty() || !self.eex_input.is_empty() {
@@ -251,11 +260,8 @@ impl<'a> State<'a> {
 
     fn push_var(&mut self) {
         if !self.input.is_empty() {
-            self.stack.push(StackItem {
-                approx: false,
-                expr: Expr::Var(self.input.clone()),
-                expr_str: None,
-            });
+            self.stack
+                .push(StackItem::new(false, Expr::Var(self.input.clone())));
             self.input.clear();
         }
     }
@@ -272,7 +278,9 @@ impl<'a> State<'a> {
         };
 
         if self.stack.len() >= 2 && self.select_idx.map_or(true, |i| i > 0) {
-            let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
+            let idx = self
+                .select_idx
+                .unwrap_or(self.stack.len().saturating_sub(1));
 
             if let Some(e) = are_in_domain(&self.stack[idx - 1].expr, &self.stack[idx].expr) {
                 self.err = Some(e);
@@ -285,11 +293,7 @@ impl<'a> State<'a> {
                 let y = self.stack.remove(idx - 1);
                 self.stack.insert(
                     idx - 1,
-                    StackItem {
-                        approx: x.approx || y.approx,
-                        expr: f(x.expr, y.expr),
-                        expr_str: None,
-                    },
+                    StackItem::new(x.approx || y.approx, f(x.expr, y.expr)),
                 );
 
                 if let Some(i) = self.select_idx.as_mut() {
@@ -321,14 +325,7 @@ impl<'a> State<'a> {
                 }
             } else {
                 let x = self.stack.remove(idx);
-                self.stack.insert(
-                    idx,
-                    StackItem {
-                        approx: x.approx,
-                        expr: f(x.expr),
-                        expr_str: None,
-                    },
-                );
+                self.stack.insert(idx, StackItem::new(x.approx, f(x.expr)));
             }
         }
     }
@@ -352,7 +349,8 @@ impl<'a> State<'a> {
     }
 
     fn toggle_approx(&mut self) {
-        if let Some(x) = self.stack.last_mut() {
+        let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
+        if let Some(x) = self.stack.get_mut(idx) {
             x.approx = !x.approx;
         }
     }

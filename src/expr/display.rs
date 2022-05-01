@@ -7,6 +7,25 @@ use num::{traits::Inv, One, Signed};
 
 use super::Expr;
 
+/// **Input must be a number which has been correctly `to_string`ed.** Returns the input in e-notation. Since it takes a pre-formatted string, this works regardless of base.
+// pub fn make_e_notation(mut s: String) -> String {
+//     if s.contains('.') {
+//         let mut ns = s.split('.');
+//         let int = ns.next();
+//         let decimal = ns.next();
+//         todo!()
+//     } else {
+//         let exponent = s.len() - 1;
+//         s.truncate(4);
+//         for _ in 0..(4usize.saturating_sub(s.len())) {
+//             s.push('0');
+//         }
+
+//         s.insert(1, '.');
+//         format!("{s}ᴇ{exponent}")
+//     }
+// }
+
 impl Expr {
     /// The grouping priority of an expression represents its position in the order of operations; higher priority means further along in the order, i.e. addition has a higher priority than exponentiation.
     pub fn grouping_priority(&self) -> u8 {
@@ -66,7 +85,7 @@ impl Expr {
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::Num(n) => write!(f, "{}", n),
+            Self::Num(n) => write!(f, "{}", n.to_string()),
             Self::Sum(ts) => {
                 let (pos, neg): (Vec<&Self>, Vec<&Self>) = ts.iter().partition(|t| t.is_positive());
 

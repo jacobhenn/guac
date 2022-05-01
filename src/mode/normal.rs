@@ -21,14 +21,14 @@ impl<'a> State<'a> {
 
         match code {
             KeyCode::Char(c)
+                if self.select_idx.is_none() && !self.eex && (c.is_digit(RADIX) || c == '.') =>
+            {
+                self.input.push(c);
+            }
+            KeyCode::Char(c)
                 if self.select_idx.is_none() && self.eex && (c.is_digit(RADIX) || c == '-') =>
             {
                 self.eex_input.push(c);
-            }
-            KeyCode::Char(c)
-                if self.select_idx.is_none() && (c.is_digit(RADIX) || c == '.') =>
-            {
-                self.input.push(c);
             }
             KeyCode::Char('q') | KeyCode::Esc => return Ok(true),
             KeyCode::Char(';') => self.toggle_approx(),

@@ -108,6 +108,15 @@ impl Expr {
         self.try_into()
     }
 
+    /// Display an expression's float equivalent.
+    pub fn display_approx(self) -> String {
+        if let Ok(n) = f64::try_from(self.clone()) {
+            format!("{n:.3e}").replace('e', "ᴇ")
+        } else {
+            self.to_string()
+        }
+    }
+
     /// Performs obvious and computationally inexpensive simplifications.
     pub fn correct(&mut self) {
         match self {
