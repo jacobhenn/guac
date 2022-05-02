@@ -5,6 +5,8 @@ use std::{
 
 use num::{traits::Inv, One, Signed};
 
+use crate::{RADIX_POW_SIX, RADIX_POW_FOUR_INV};
+
 use super::Expr;
 
 /// **Input must be a number which has been correctly `to_string`ed.** Returns the input in e-notation. Since it takes a pre-formatted string, this works regardless of base.
@@ -27,6 +29,31 @@ use super::Expr;
 // }
 
 impl Expr {
+    /// Display an expression's float equivalent.
+    pub fn display_approx(self) -> String {
+        if let Ok(n) = f64::try_from(self.clone()) {
+            if n >= f64::from(RADIX_POW_SIX) || n <= RADIX_POW_FOUR_INV {
+                format!("{n:.3e}").replace('e', "ᴇ")
+            } else {
+                format!("{n:.3}")
+            }
+        } else {
+            self.to_string()
+        }
+    }
+
+    /// Represents its desired position in a product; i.e., coefficients have a higher priority than variables.
+    pub fn product_priority(&self) -> u8 {
+        match self {
+            Expr::Num(_) => 0,
+            Expr::Power(_, _) => 2,
+            Expr::Log(_, _) => 1,
+            Expr::Var(_) => 4,
+            Expr::Const(_) => 3,
+            _ => 5,
+        }
+    }
+
     /// The grouping priority of an expression represents its position in the order of operations; higher priority means further along in the order, i.e. addition has a higher priority than exponentiation.
     pub fn grouping_priority(&self) -> u8 {
         match self {
@@ -85,7 +112,7 @@ impl Expr {
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::Num(n) => write!(f, "{}", n.to_string()),
+            Self::Num(n) => write!(f, "{n}"),
             Self::Sum(ts) => {
                 let (pos, neg): (Vec<&Self>, Vec<&Self>) = ts.iter().partition(|t| t.is_positive());
 

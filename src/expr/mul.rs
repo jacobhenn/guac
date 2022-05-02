@@ -108,7 +108,7 @@ impl MulAssign for Expr {
     fn mul_assign(&mut self, rhs: Self) {
         let self_factors = self.factors();
         let (like, unlike): (Vec<Self>, Vec<Self>) = rhs
-            .into_terms()
+            .into_factors()
             .into_iter()
             .partition(|t| self_factors.iter().any(|st| t.is_like_factor(st)));
 
@@ -124,5 +124,8 @@ impl MulAssign for Expr {
         }
 
         self.correct();
+        if let Self::Product(ts) = self {
+            ts.sort_unstable_by_key(Expr::product_priority)
+        }
     }
 }

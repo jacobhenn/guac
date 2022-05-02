@@ -42,6 +42,10 @@ use std::{
 
 const RADIX: u32 = 10;
 
+const RADIX_POW_SIX: u32 = 1_000_000;
+
+const RADIX_POW_FOUR_INV: f64 = 0.001;
+
 /// A representation of an error on the user's end.
 pub enum SoftError {
     /// Operation would divided by zero.
@@ -106,7 +110,7 @@ pub struct StackItem {
 }
 
 impl StackItem {
-    /// Create a new StackItem and cache its rendered strings.
+    /// Create a new `StackItem` and cache its rendered strings.
     pub fn new(approx: bool, expr: Expr) -> Self {
         Self {
             approx,
@@ -280,7 +284,7 @@ impl<'a> State<'a> {
         if self.stack.len() >= 2 && self.select_idx.map_or(true, |i| i > 0) {
             let idx = self
                 .select_idx
-                .unwrap_or(self.stack.len().saturating_sub(1));
+                .unwrap_or_else(|| self.stack.len().saturating_sub(1));
 
             if let Some(e) = are_in_domain(&self.stack[idx - 1].expr, &self.stack[idx].expr) {
                 self.err = Some(e);

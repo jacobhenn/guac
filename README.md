@@ -4,13 +4,13 @@
 
 ```
 $ guac
-x sqrt(π)/5 foo█
-                        (q: quit) rad enter variable
+x sqrt(π)/5 78█
+                                                                          (q: quit) rad
 ```
 
-## Install
+## install
 
-`guac` should work on all of [these](https://github.com/crossterm-rs/crossterm#tested-terminals) terminals, and probably more. If you have the Rust toolchain installed, simply:
+`guac` should work on all of [these](https://github.com/crossterm-rs/crossterm#tested-terminals) terminals, and probably more. if you have the [rust toolchain](https://www.rust-lang.org/tools/install) installed, simply:
 
 ```
 $ git clone https://github.com/jacobhenn/guac.git
@@ -18,11 +18,11 @@ $ cd guac
 $ cargo install --path .
 ```
 
-If you won't be developing `guac`, run `cargo clean` after installing to save disc space.
+if you won't be developing `guac`, run `cargo clean` after installing to save disc space.
 
-## Keybindings
+## keybindings
 
-*See this list in the terminal by running* `guac keys`.
+*see this list in the terminal by running* `guac keys`.
 
 - `q`: **q**uit
 - `[e\-.0-9]`: type a number in the input (`e` for e-notation)
@@ -78,3 +78,9 @@ If you won't be developing `guac`, run `cargo clean` after installing to save di
         - `e`: **e**lectron (kg)
         - `p`: **p**roton (kg)
     - `esc`: cancel
+
+## known issues
+
+- `guac` doesn't do *too* well with very narrow (⪅15 column) terminals, or with quickly resizing terminals, although it won't totally break.
+- `guac` does not directly set any limit on number size or precision; this is by design. it will absolutely try to perform any operation you tell it to, and will only panic on account of insufficient resources if the `num` crate or any system call it performs does. if it hangs too long on an operation, just run `pkill guac` from another terminal or close the window.
+- the algorithms `guac` uses to perform algebra are all hand-written, and their correctness has not been proven. if you encounter an inconsistency, please submit an issue.

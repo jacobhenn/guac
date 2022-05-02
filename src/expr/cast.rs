@@ -32,7 +32,9 @@ impl TryFrom<Expr> for f64 {
             Expr::Const(c) => Ok(c.into()),
             Expr::Mod(x, y) => Ok(x.to_f64()? % y.to_f64()?),
             Expr::Sin(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.sin()),
-            _ => Err(()),
+            Expr::Cos(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.cos()),
+            Expr::Tan(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.tan()),
+            Expr::Var(_) => Err(()),
         }
     }
 }
@@ -62,8 +64,7 @@ pub fn parse_decimal_rational(s: &str) -> Option<BigRational> {
     if sep.len() == 2 {
         Some(
             sep[0].parse::<BigRational>().ok()?
-                + sep[1].parse::<BigRational>().ok()?
-                    / BigInt::from(10i32.pow(sep[1].len() as u32)),
+                + sep[1].parse::<BigRational>().ok()? / BigInt::from(10u8).pow(sep[1].len() as u32),
         )
     } else {
         None
