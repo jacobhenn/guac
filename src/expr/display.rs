@@ -74,9 +74,9 @@ impl Expr {
     /// Use the grouping priority of `self` and `child` to decide wether or not to surround `child` in parens, then format it.
     pub fn format_child(&self, child: &Self) -> String {
         if child.grouping_priority() > self.grouping_priority() || child.is_mod() {
-            format!("({})", child)
+            format!("({child})")
         } else {
-            format!("{}", child)
+            format!("{child}")
         }
     }
 

@@ -67,6 +67,37 @@ pub enum Expr {
 }
 
 impl Expr {
+    /// If this expression *contains* other `Expr`s, return a list of references to them.
+    // pub fn inners(&self) -> Option<Vec<&Expr>> {
+    //     match self {
+    //         Self::Num(_) => None,
+    //         Self::Sum(ts) => Some(ts.iter().collect()),
+    //         Self::Product(fs) => Some(fs.iter().collect()),
+    //         Self::Power(b, e) => Some(vec![b, e]),
+    //         Self::Log(b, a) => Some(vec![b, a]),
+    //         Self::Var(_) => None,
+    //         Self::Const(_) => None,
+    //         Self::Mod(n, d) => Some(vec![n, d]),
+    //         Self::Sin(a, _) => Some(vec![a]),
+    //         Self::Cos(a, _) => Some(vec![a]),
+    //         Self::Tan(a, _) => Some(vec![a]),
+    //     }
+    // }
+
+    pub fn complexity(&self) -> u32 {
+        match self {
+            Self::Sum(ts) => ts.into_iter().map(Expr::complexity).sum(),
+            Self::Product(fs) => fs.into_iter().map(Expr::complexity).sum(),
+            Self::Power(x, y) => x.complexity() + y.complexity(),
+            Self::Log(x, y) => x.complexity() + y.complexity(),
+            Self::Mod(x, y) => x.complexity() + y.complexity(),
+            Self::Sin(x, _) => x.complexity(),
+            Self::Cos(x, _) => x.complexity(),
+            Self::Tan(x, _) => x.complexity(),
+            _ => 1,
+        }
+    }
+
     /// Is this expression a Num variant?
     pub const fn is_num(&self) -> bool {
         matches!(self, Self::Num(..))

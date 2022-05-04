@@ -32,7 +32,7 @@ impl Expr {
     #[must_use]
     pub fn into_base(self) -> Self {
         match self {
-            Self::Num(n) if n.numer().is_one() => Self::Num(BigRational::from(n.denom().clone())),
+            // Self::Num(n) if n.numer().is_one() => Self::Num(BigRational::from(n.denom().clone())),
             Self::Power(b, ..) => *b,
             other => other,
         }
@@ -58,7 +58,7 @@ impl Expr {
     #[must_use]
     pub fn into_exponent(self) -> Self {
         match self {
-            Self::Num(n) if n.numer().is_one() => Self::from(-1),
+            // Self::Num(n) if n.numer().is_one() => Self::from(-1),
             Self::Power(_, e) => *e,
             _ => One::one(),
         }
@@ -93,6 +93,15 @@ impl Expr {
             }
         }
     }
+
+    /// Multiply `self` by a single factor.
+    pub fn mul_single_factor(&mut self, rhs: Self) {
+        if let Some(factor) = self.factors_mut().into_iter().find(|x| x.is_like_factor(&rhs)) {
+            factor.combine_like_factors(rhs);
+        } else {
+            self.push_factor(rhs);
+        }
+    }
 }
 
 impl Mul for Expr {
@@ -106,21 +115,8 @@ impl Mul for Expr {
 
 impl MulAssign for Expr {
     fn mul_assign(&mut self, rhs: Self) {
-        let self_factors = self.factors();
-        let (like, unlike): (Vec<Self>, Vec<Self>) = rhs
-            .into_factors()
-            .into_iter()
-            .partition(|t| self_factors.iter().any(|st| t.is_like_factor(st)));
-
-        for factor in unlike {
-            self.push_factor(factor);
-        }
-
-        let mut self_factors = self.factors_mut();
-        for factor in like {
-            if let Some(self_factor) = self_factors.iter_mut().find(|f| factor.is_like_factor(f)) {
-                self_factor.combine_like_factors(factor);
-            }
+        for factor in rhs.into_factors() {
+            self.mul_single_factor(factor);
         }
 
         self.correct();

@@ -158,7 +158,12 @@ impl<'a> State<'a> {
         let mut selected_pos = None;
         for i in 0..self.stack.len() {
             let stack_item = &mut self.stack[i];
-            let expr_str = stack_item.to_string();
+
+            let expr_str = if option_env!("GUAC_DEBUG") == Some("true") {
+                format!("{:?}", stack_item.expr)
+            } else {
+                stack_item.to_string()
+            };
 
             if Some(i) == self.select_idx {
                 selected_pos = Some(len + expr_str.len() / 2);

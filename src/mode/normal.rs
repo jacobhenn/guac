@@ -125,6 +125,12 @@ impl<'a> State<'a> {
                     },
                 );
             }
+            #[cfg(debug_assertions)]
+            KeyCode::Char(']') => {
+                if let Some(e) = self.stack.last() {
+                    self.err = Some(SoftError::Debug(e.expr.complexity().to_string()));
+                }
+            }
             KeyCode::Char('x') => self.push_expr(Expr::Var("x".to_string())),
             KeyCode::Char('k') => self.mode = Mode::Constant,
             KeyCode::Char('v') => {

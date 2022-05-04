@@ -135,12 +135,12 @@ impl<'a> State<'a> {
     /// Variable mode: allows the user to freely type in a custom variable name without triggering single-letter keybinds
     pub fn variable(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
         match code {
-            Char(c) if !c.is_digit(RADIX) && !"+-·/^%()".contains(c) => {
-                self.input.push(c);
-            }
             Enter | Char(' ') => {
                 self.push_var();
                 self.mode = Mode::Normal;
+            }
+            Char(c) if !c.is_digit(RADIX) && !"*+-·/^%()".contains(c) => {
+                self.input.push(c);
             }
             Backspace => {
                 self.input.pop();
