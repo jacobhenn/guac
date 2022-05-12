@@ -1,5 +1,5 @@
 use super::Expr;
-use num::{traits::Pow, One, BigRational};
+use num::{traits::Pow, One};
 use std::ops::{Mul, MulAssign};
 
 impl Expr {
@@ -32,7 +32,7 @@ impl Expr {
     #[must_use]
     pub fn into_base(self) -> Self {
         match self {
-            // Self::Num(n) if n.numer().is_one() => Self::Num(BigRational::from(n.denom().clone())),
+            // Self::Num(n) if n < BigRational::one() => self.inv(),
             Self::Power(b, ..) => *b,
             other => other,
         }
@@ -41,6 +41,7 @@ impl Expr {
     /// Return the exponent of this expression. e.g., x^2 -> 2, x+5 -> None
     pub const fn exponent(&self) -> Option<&Self> {
         match self {
+            // Self::Num(n)
             Self::Power(_, e) => Some(e),
             _ => None,
         }
@@ -94,14 +95,47 @@ impl Expr {
         }
     }
 
-    /// Multiply `self` by a single factor.
-    pub fn mul_single_factor(&mut self, rhs: Self) {
-        if let Some(factor) = self.factors_mut().into_iter().find(|x| x.is_like_factor(&rhs)) {
+    /// Multiply `self` by a single factor, distributing over sums.
+    pub fn distribute_factor(&mut self, rhs: Self) {
+        let rhs_terms = rhs.into_terms();
+        for self_term in self.terms_mut() {
+            for rhs_term in rhs_terms.clone() {
+                self_term.mul_factor_nondistributing(rhs_term);
+            }
+        }
+    }
+
+    /// Multiply `self` by a single factor, but do not distribute over sums.
+    pub fn mul_factor_nondistributing(&mut self, rhs: Self) {
+        if let Some(factor) = self
+            .factors_mut()
+            .into_iter()
+            .find(|x| x.is_like_factor(&rhs))
+        {
             factor.combine_like_factors(rhs);
         } else {
             self.push_factor(rhs);
         }
     }
+
+    // /// Multiply `self` by a single factor. If either is a sum, try both `mul_sf_distributing` and `mul_sf_nondistributing` and choose whichever result has the least `complexity`.
+    // pub fn mul_sf_bifurcating(&mut self, rhs: Self) {
+    //     if matches!(self, Self::Sum(..)) || matches!(rhs, Self::Sum(..)) {
+    //         let mut d = self.clone();
+    //         let mut nd = self.clone();
+    //         d.mul_sf_distributing(rhs.clone());
+    //         nd.mul_sf_nondistributing(rhs);
+    //         d.correct();
+    //         nd.correct();
+    //         if d.complexity() < nd.complexity() {
+    //             *self = d;
+    //         } else {
+    //             *self = nd;
+    //         }
+    //     } else {
+    //         self.mul_sf_nondistributing(rhs);
+    //     }
+    // }
 }
 
 impl Mul for Expr {
@@ -116,7 +150,7 @@ impl Mul for Expr {
 impl MulAssign for Expr {
     fn mul_assign(&mut self, rhs: Self) {
         for factor in rhs.into_factors() {
-            self.mul_single_factor(factor);
+            self.distribute_factor(factor);
         }
 
         self.correct();

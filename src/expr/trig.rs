@@ -1,6 +1,9 @@
 use std::{convert::TryInto, ops::Neg};
 
-use num::{One, Signed, Zero, traits::Pow};
+use num::{
+    traits::{Inv, Pow},
+    One, Signed, Zero,
+};
 
 use crate::config::AngleMeasure;
 
@@ -15,10 +18,6 @@ impl AngleMeasure {
             AngleMeasure::Degree => Expr::from_int(360),
             AngleMeasure::Minute => Expr::from_int(21600),
             AngleMeasure::Second => Expr::from_int(1_296_000),
-            AngleMeasure::HalfTurn => Expr::from_int(2),
-            AngleMeasure::Quadrant => Expr::from_int(4),
-            AngleMeasure::Sextant => Expr::from_int(6),
-            AngleMeasure::Hexacontade => Expr::from_int(60),
             AngleMeasure::BinaryDegree => Expr::from_int(256),
             AngleMeasure::HourAngle => Expr::from_int(24),
             AngleMeasure::Point => Expr::from_int(32),
@@ -132,6 +131,74 @@ impl Expr {
                 _ => Self::Tan(Box::new(self), measure),
             },
             _ => Self::Tan(Box::new(self), measure),
+        }
+    }
+
+    /// Take the inverse sine of this expression in the current angle measure.
+    #[must_use]
+    pub fn asin(self, measure: AngleMeasure) -> Self {
+        if self.is_negative() {
+            return self.neg().asin(measure).neg();
+        }
+
+        if self.is_zero() {
+            Self::zero().turns_to(measure)
+        } else if self == Self::from((1, 2)) {
+            Self::from((1, 12)).turns_to(measure)
+        } else if self == Self::from(2).sqrt().inv() {
+            Self::from((1, 8)).turns_to(measure)
+        } else if self == Self::from(3).sqrt() / Self::from(2) {
+            Self::from((1, 6)).turns_to(measure)
+        } else if self.is_one() {
+            Self::from((1, 4)).turns_to(measure)
+        } else {
+            Self::Asin(Box::new(self), measure)
+        }
+    }
+
+    /// Take the inverse cosine of this expression in the current angle measure.
+    #[must_use]
+    pub fn acos(self, measure: AngleMeasure) -> Self {
+        if self.is_negative() {
+            return Self::one() - self.neg().asin(measure);
+        }
+
+        if self.is_zero() {
+            Self::from((1, 4)).turns_to(measure)
+        } else if self == Self::from((1, 2)) {
+            Self::from((1, 6)).turns_to(measure)
+        } else if self == Self::from(2).sqrt().inv() {
+            Self::from((1, 8)).turns_to(measure)
+        } else if self == Self::from(3).sqrt() / Self::from(2) {
+            Self::from((1, 12)).turns_to(measure)
+        } else if self.is_one() {
+            Self::zero().turns_to(measure)
+        } else {
+            Self::Acos(Box::new(self), measure)
+        }
+    }
+
+    /// Take the inverse tangent of this expression in the current angle measure.
+    #[must_use]
+    pub fn atan(self, measure: AngleMeasure) -> Self {
+        if self.is_negative() {
+            return self.neg().atan(measure).neg();
+        }
+
+        if self.is_zero() {
+            Self::zero().turns_to(measure)
+        } else if self == Self::from(2) - Self::from(3).sqrt() {
+            Self::from((1, 24)).turns_to(measure)
+        } else if self == Self::from(2) + Self::from(3).sqrt() {
+            Self::from((5, 24)).turns_to(measure)
+        } else if self == Self::from(3).sqrt().inv() {
+            Self::from((1, 12)).turns_to(measure)
+        } else if self == Self::from(3).sqrt() {
+            Self::from((1, 6)).turns_to(measure)
+        } else if self.is_one() {
+            Self::from((1, 8)).turns_to(measure)
+        } else {
+            Self::Atan(Box::new(self), measure)
         }
     }
 }

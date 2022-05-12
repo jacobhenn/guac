@@ -64,6 +64,15 @@ pub enum Expr {
 
     /// The tangent of another expression in the given units.
     Tan(Box<Self>, AngleMeasure),
+
+    /// The inverse sine of another expression in the given units.
+    Asin(Box<Self>, AngleMeasure),
+
+    /// The inverse cosine of another expression in the given units.
+    Acos(Box<Self>, AngleMeasure),
+
+    /// The inverse tangent of another expression in the given units.
+    Atan(Box<Self>, AngleMeasure),
 }
 
 impl Expr {
@@ -84,17 +93,49 @@ impl Expr {
     //     }
     // }
 
+    /// Are any of this expression's sub-expressions a variable?
+    pub fn contains_var(&self) -> bool {
+        match self {
+            Self::Num(_) => false,
+            Self::Sum(ts) => ts.into_iter().any(|t| t.contains_var()),
+            Self::Product(fs) => fs.into_iter().any(|f| f.contains_var()),
+            Self::Power(x, y) => x.contains_var() || y.contains_var(),
+            Self::Log(x, y) => x.contains_var() || y.contains_var(),
+            Self::Var(_) => true,
+            Self::Const(_) => false,
+            Self::Mod(x, y) => x.contains_var() || y.contains_var(),
+            Self::Sin(x, _) => x.contains_var(),
+            Self::Cos(x, _) => x.contains_var(),
+            Self::Tan(x, _) => x.contains_var(),
+            Self::Asin(x, _) => x.contains_var(),
+            Self::Acos(x, _) => x.contains_var(),
+            Self::Atan(x, _) => x.contains_var(),
+        }
+    }
+
+    /// How "big" is this expression in terms of sub-expressions?
+    ///
+    /// # Examples
+    ///
+    /// - The complexity of `2·x+5` is 3, one for each "leaf" of the expression tree.
+    /// - The complexity of `sin(acos(tan(3)))`` is 4, because even though there's only one "leaf"
+    /// it's clearly more complex than the expression `3`.
     pub fn complexity(&self) -> u32 {
         match self {
             Self::Sum(ts) => ts.into_iter().map(Expr::complexity).sum(),
             Self::Product(fs) => fs.into_iter().map(Expr::complexity).sum(),
             Self::Power(x, y) => x.complexity() + y.complexity(),
-            Self::Log(x, y) => x.complexity() + y.complexity(),
-            Self::Mod(x, y) => x.complexity() + y.complexity(),
-            Self::Sin(x, _) => x.complexity(),
-            Self::Cos(x, _) => x.complexity(),
-            Self::Tan(x, _) => x.complexity(),
-            _ => 1,
+            Self::Log(x, y) => x.complexity() + y.complexity() + 1,
+            Self::Mod(x, y) => x.complexity() + y.complexity() + 1,
+            Self::Sin(x, _) => x.complexity() + 1,
+            Self::Cos(x, _) => x.complexity() + 1,
+            Self::Tan(x, _) => x.complexity() + 1,
+            Self::Asin(x, _) => x.complexity() + 1,
+            Self::Acos(x, _) => x.complexity() + 1,
+            Self::Atan(x, _) => x.complexity() + 1,
+            // This is not a catch-all, because I don't want it to silently catch new Expr
+            // variants that don't have a complexity of 1.
+            Self::Var(_) | Self::Const(_) | Self::Num(_) => 1,
         }
     }
 

@@ -235,6 +235,6 @@ impl Signed for Expr {
     }
 
     fn is_negative(&self) -> bool {
-        !self.is_positive() && !self.is_zero()
+        !self.is_zero() && !self.is_positive()
     }
 }

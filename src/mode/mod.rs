@@ -104,7 +104,6 @@ impl<'a> State<'a> {
             Char('q') => {
                 return Ok(true);
             }
-            Char('P') => self.push_expr(Expr::Const(Const::Tau)),
             Char('H') => self.push_expr(Expr::Const(Const::Hbar)),
             Char('G') => self.push_expr(Expr::Const(Const::G)),
             Char('E') => self.push_expr(Expr::Const(Const::Qe)),

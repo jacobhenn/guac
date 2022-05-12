@@ -39,7 +39,6 @@
     - esc: cancel
 - k: enter constant mode
     - p: pi
-    - P: tau
     - e: e
     - g: euler-mascheroni constant
     - c: speed of light (m·s⁻¹)

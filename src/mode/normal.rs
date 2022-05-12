@@ -1,10 +1,10 @@
 use std::ops::Neg;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use num::{
     traits::{Inv, Pow},
-    Signed, Zero,
+    One, Signed, Zero,
 };
 
 use crate::{
@@ -17,8 +17,6 @@ use super::Mode;
 impl<'a> State<'a> {
     /// Process a keypress in normal mode.
     pub fn normal(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
-        self.write_modeline().context("couldn't write modeline")?;
-
         match code {
             KeyCode::Char(c)
                 if self.select_idx.is_none() && !self.eex && (c.is_digit(RADIX) || c == '.') =>
@@ -33,14 +31,10 @@ impl<'a> State<'a> {
             KeyCode::Char('q') | KeyCode::Esc => return Ok(true),
             KeyCode::Char(';') => self.toggle_approx(),
             KeyCode::Enter | KeyCode::Char(' ') => {
-                if self.select_idx.is_some() {
-                    self.dup();
-                } else {
-                    let did_push_input = self.push_input();
-                    if !did_push_input {
-                        self.dup();
-                    }
-                }
+                self.push_input();
+            }
+            KeyCode::Tab => {
+                self.dup();
             }
             KeyCode::Char('d') => {
                 self.drop();
@@ -125,10 +119,34 @@ impl<'a> State<'a> {
                     },
                 );
             }
+            KeyCode::Char('S') => {
+                let angle_measure = self.config.angle_measure;
+                self.apply_unary(
+                    |x| x.asin(angle_measure),
+                    |x| {
+                        (!x.contains_var() && (x >= &Expr::one() || x <= &Expr::one().neg()))
+                            .then(|| SoftError::Complex)
+                    },
+                );
+            }
+            KeyCode::Char('C') => {
+                let angle_measure = self.config.angle_measure;
+                self.apply_unary(
+                    |x| x.acos(angle_measure),
+                    |x| {
+                        (!x.contains_var() && (x <= &Expr::one() || x >= &Expr::one().neg()))
+                            .then(|| SoftError::Complex)
+                    },
+                );
+            }
+            KeyCode::Char('T') => {
+                let angle_measure = self.config.angle_measure;
+                self.apply_unary(|x| x.atan(angle_measure), |_| None);
+            }
             #[cfg(debug_assertions)]
             KeyCode::Char(']') => {
                 if let Some(e) = self.stack.last() {
-                    self.err = Some(SoftError::Debug(e.expr.complexity().to_string()));
+                    self.err = Some(SoftError::Debug(e.expr.is_negative().to_string()));
                 }
             }
             KeyCode::Char('x') => self.push_expr(Expr::Var("x".to_string())),

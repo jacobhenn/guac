@@ -150,20 +150,27 @@ impl Display for Expr {
             }
             Self::Power(b, e) => {
                 if **e == Self::from((1, 2)) {
-                    write!(f, "sqrt({})", b)
+                    write!(f, "sqrt({b})")
                 } else if **e == Self::from((1, 3)) {
-                    write!(f, "cbrt({})", b)
+                    write!(f, "cbrt({b})")
+                } else if **e == Self::from((1, 2)).neg() {
+                    write!(f, "1/sqrt({b})")
+                } else if **e == Self::from((1, 3)).neg() {
+                    write!(f, "1/cbrt({b})")
                 } else {
                     write!(f, "{}^{}", self.format_child(b), self.format_child(e))
                 }
             }
-            Self::Var(s) => write!(f, "{}", s),
-            Self::Const(c) => write!(f, "{}", c),
+            Self::Var(s) => write!(f, "{s}"),
+            Self::Const(c) => write!(f, "{c}"),
             Self::Mod(x, y) => write!(f, "{} mod {}", self.format_child(x), self.format_child(y)),
-            Self::Log(b, a) => write!(f, "log({})({})", b, a),
-            Self::Sin(t, m) => write!(f, "sin({} {})", t, m),
-            Self::Cos(t, m) => write!(f, "cos({} {})", t, m),
-            Self::Tan(t, m) => write!(f, "tan({} {})", t, m),
+            Self::Log(b, a) => write!(f, "log({b})({a})"),
+            Self::Sin(t, m) => write!(f, "sin({t} {m})"),
+            Self::Cos(t, m) => write!(f, "cos({t} {m})"),
+            Self::Tan(t, m) => write!(f, "tan({t} {m})"),
+            Self::Asin(t, m) => write!(f, "(arcsin({t}) {m})"),
+            Self::Acos(t, m) => write!(f, "(arccos({t}) {m})"),
+            Self::Atan(t, m) => write!(f, "(arctan({t}) {m})"),
         }
     }
 }

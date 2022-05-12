@@ -10,8 +10,15 @@ edition = "2021"
 anyhow = "1"
 crossterm = "0.23"
 colored = "2"
-num = "0.4"
 argh = "0.1"
+num = "0.4"
+
+[dev-dependencies]
+rand = "0.8"
+
+[dev-dependencies.num]
+version = "0.4"
+features = ["rand"]
 
 [profile.dev]
 opt-level = "z"

@@ -20,6 +20,9 @@ mod config;
 
 mod mode;
 
+#[cfg(test)]
+mod tests;
+
 use crate::args::Args;
 use crate::expr::Expr;
 use anyhow::{bail, Context, Error};
@@ -223,7 +226,10 @@ impl<'a> State<'a> {
     }
 
     fn push_expr(&mut self, expr: Expr) {
-        self.stack.push(StackItem::new(false, expr));
+        self.stack.insert(self.select_idx.unwrap_or(self.stack.len()), StackItem::new(false, expr));
+        if let Some(i) = &mut self.select_idx {
+            *i += 1;
+        }
     }
 
     fn drop(&mut self) {

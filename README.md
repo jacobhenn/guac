@@ -65,7 +65,6 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
     - `esc`: cancel
 - `k`: enter **c**onstant mode
     - `p`: **p**i
-    - `P`: tau
     - `e`: **e**
     - `g`: euler-mascheroni constant
     - `c`: speed of light (m·s⁻¹)
@@ -83,4 +82,4 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 
 - `guac` doesn't do *too* well with very narrow (⪅15 column) terminals, or with quickly resizing terminals, although it won't totally break.
 - `guac` does not directly set any limit on number size or precision; this is by design. it will absolutely try to perform any operation you tell it to, and will only panic on account of insufficient resources if the `num` crate or any system call it performs does. if it hangs too long on an operation, just run `pkill guac` from another terminal or close the window.
-- the algorithms `guac` uses to perform algebra are all hand-written, and their correctness has not been proven. if you encounter an inconsistency, please submit an issue.
+- the algorithms `guac` uses to perform algebra are all hand-written, and their correctness should not be assumed at this stage of development. if you encounter an inconsistency, please submit an issue.
