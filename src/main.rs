@@ -506,12 +506,16 @@ fn cleanup() {
     }
 }
 
-fn guac_interactive(anyway: bool) -> Result<(), Error> {
+fn guac_interactive(force: bool) -> Result<(), Error> {
     let stdout = stdout();
     let stdout = stdout.lock();
 
-    if !anyway && !stdout.is_tty() {
-        bail!("stdout is not a tty. use `guac anyway` to run anyway.");
+    if !force {
+        if !stdout.is_tty() {
+            bail!("stdout is not a tty. use --force to run anyway.");
+        } else if terminal::size().context("couldn't get terminal size")?.0 < 15 {
+            bail!("terminal is too small. use --force to run anyway.")
+        }
     }
 
     terminal::enable_raw_mode().context("couldn't enable raw mode")?;
@@ -542,13 +546,8 @@ fn go() -> Result<(), Error> {
 
     match args.subc {
         Some(SubCommand::Keys(..)) => print!(include_str!("keys.txt")),
-        Some(SubCommand::Anyway(..)) => guac_interactive(true)?,
         None => {
-            if terminal::size().context("couldn't get terminal size")?.0 < 15 {
-                bail!("terminal is too small. use `guac anyway` to run anyway.")
-            }
-
-            guac_interactive(false)?;
+            guac_interactive(args.force)?;
         }
     }
 
