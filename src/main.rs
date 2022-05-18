@@ -42,7 +42,9 @@ use mode::{Mode, Status};
 use num::{traits::Pow, BigInt, BigRational, Signed};
 use std::{
     fmt::Display,
-    io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write}, process::exit, mem,
+    io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write},
+    mem,
+    process::exit,
 };
 
 const RADIX: u32 = 10;
@@ -381,26 +383,6 @@ impl<'a> State<'a> {
         }
     }
 
-    fn cleanup(&mut self) -> Result<(), Error> {
-        self.stdout
-            .execute(cursor::Show)
-            .context("couldn't show cursor")?;
-        terminal::disable_raw_mode().context("couldn't disable raw mode")?;
-
-        println!();
-        self.stdout
-            .execute(terminal::Clear(ClearType::CurrentLine))
-            .context("couldn't clear modeline")?;
-
-        if self.stack.is_empty() && self.input.is_empty() {
-            self.stdout
-                .execute(cursor::MoveUp(1))
-                .context("couldn't move cursor")?;
-        }
-
-        Ok(())
-    }
-
     fn init_from_stdin(&mut self) {
         let stdin = stdin();
 
@@ -479,9 +461,7 @@ impl<'a> State<'a> {
                         }
                         self.render().context("couldn't render the state")?;
                     }
-                    Status::Debug => {
-                        bail!("debugging err handling");
-                    }
+                    Status::Debug => bail!("debug"),
                 }
             }
         }
@@ -504,21 +484,25 @@ impl<'a> State<'a> {
         self.write_modeline().context("couldn't write modeline")?;
         self.render().context("couldn't render the state")?;
 
-        match self.ev_loop() {
-            Ok(_) => {
-                self.cleanup()
-                    .context("couldn't clean up after event loop")?;
-            }
-            Err(e) => {
-                if self.cleanup().is_err() {
-                    println!("\n\r\n\r");
-                }
-
-                eprintln!("{}{} {e:#}", "error".bold().red(), ":".bold());
-            }
-        }
+        self.ev_loop()?;
 
         Ok(())
+    }
+}
+
+#[allow(unused_must_use)]
+/// Try our best to clean up the terminal state; if too many errors happen, just print some newlines and call it good.
+fn cleanup() {
+    let stdout = stdout();
+    let mut stdout = stdout.lock();
+    if stdout.is_tty() {
+        stdout.execute(cursor::Show);
+        if terminal::disable_raw_mode().is_ok() {
+            println!();
+        } else {
+            print!("\n\r\n\r");
+        }
+        stdout.execute(terminal::Clear(ClearType::CurrentLine));
     }
 }
 
@@ -548,7 +532,7 @@ fn guac_interactive(anyway: bool) -> Result<(), Error> {
 
     state.init_from_stdin();
 
-    state.start().context("couldn't start the event loop")?;
+    state.start()?;
 
     Ok(())
 }
@@ -572,15 +556,10 @@ fn go() -> Result<(), Error> {
 }
 
 fn main() {
-    match go() {
-        Ok(_) => (),
-        Err(e) => {
-            if terminal::disable_raw_mode().is_err() {
-                println!("\n\r\n\r");
-            }
-
-            eprintln!("{}{} {e:#}", "error".bold().red(), ":".bold());
-            exit(1);
-        }
+    let res = go();
+    cleanup();
+    if let Err(e) = res {
+        eprintln!("{}{} {e:#}", "guac error".bold().red(), ":".bold());
+        exit(1);
     }
 }
