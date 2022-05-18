@@ -96,20 +96,18 @@ impl Expr {
     /// Are any of this expression's sub-expressions a variable?
     pub fn contains_var(&self) -> bool {
         match self {
-            Self::Num(_) => false,
-            Self::Sum(ts) => ts.into_iter().any(|t| t.contains_var()),
-            Self::Product(fs) => fs.into_iter().any(|f| f.contains_var()),
-            Self::Power(x, y) => x.contains_var() || y.contains_var(),
-            Self::Log(x, y) => x.contains_var() || y.contains_var(),
+            Self::Num(_) | Self::Const(_) => false,
+            Self::Sum(xs) | Self::Product(xs) => xs.iter().any(Self::contains_var),
+            Self::Power(x, y) | Self::Log(x, y) | Self::Mod(x, y) => {
+                x.contains_var() || y.contains_var()
+            }
             Self::Var(_) => true,
-            Self::Const(_) => false,
-            Self::Mod(x, y) => x.contains_var() || y.contains_var(),
-            Self::Sin(x, _) => x.contains_var(),
-            Self::Cos(x, _) => x.contains_var(),
-            Self::Tan(x, _) => x.contains_var(),
-            Self::Asin(x, _) => x.contains_var(),
-            Self::Acos(x, _) => x.contains_var(),
-            Self::Atan(x, _) => x.contains_var(),
+            Self::Sin(x, _)
+            | Self::Cos(x, _)
+            | Self::Tan(x, _)
+            | Self::Asin(x, _)
+            | Self::Acos(x, _)
+            | Self::Atan(x, _) => x.contains_var(),
         }
     }
 
@@ -118,21 +116,20 @@ impl Expr {
     /// # Examples
     ///
     /// - The complexity of `2·x+5` is 3, one for each "leaf" of the expression tree.
-    /// - The complexity of `sin(acos(tan(3)))`` is 4, because even though there's only one "leaf"
+    /// - The complexity of `sin(acos(tan(3)))` is 4, because even though there's only one "leaf"
     /// it's clearly more complex than the expression `3`.
     pub fn complexity(&self) -> u32 {
         match self {
-            Self::Sum(ts) => ts.into_iter().map(Expr::complexity).sum(),
-            Self::Product(fs) => fs.into_iter().map(Expr::complexity).sum(),
+            Self::Sum(ts) => ts.iter().map(Self::complexity).sum(),
+            Self::Product(fs) => fs.iter().map(Self::complexity).sum(),
             Self::Power(x, y) => x.complexity() + y.complexity(),
-            Self::Log(x, y) => x.complexity() + y.complexity() + 1,
-            Self::Mod(x, y) => x.complexity() + y.complexity() + 1,
-            Self::Sin(x, _) => x.complexity() + 1,
-            Self::Cos(x, _) => x.complexity() + 1,
-            Self::Tan(x, _) => x.complexity() + 1,
-            Self::Asin(x, _) => x.complexity() + 1,
-            Self::Acos(x, _) => x.complexity() + 1,
-            Self::Atan(x, _) => x.complexity() + 1,
+            Self::Log(x, y) | Self::Mod(x, y) => x.complexity() + y.complexity() + 1,
+            Self::Sin(x, _)
+            | Self::Cos(x, _)
+            | Self::Tan(x, _)
+            | Self::Asin(x, _)
+            | Self::Acos(x, _)
+            | Self::Atan(x, _) => x.complexity() + 1,
             // This is not a catch-all, because I don't want it to silently catch new Expr
             // variants that don't have a complexity of 1.
             Self::Var(_) | Self::Const(_) | Self::Num(_) => 1,
@@ -176,6 +173,7 @@ impl Expr {
     }
 
     /// Returns a floating-point approximation of the real number represented by this expression.
+    #[allow(clippy::result_unit_err)]
     pub fn to_f64(self) -> Result<f64, ()> {
         self.try_into()
     }

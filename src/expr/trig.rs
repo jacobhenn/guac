@@ -10,6 +10,7 @@ use crate::config::AngleMeasure;
 use super::{constant::Const, Expr};
 
 impl AngleMeasure {
+    /// Return how many of this angle measure make up a full turn.
     pub fn full_turn(self) -> Expr {
         match self {
             AngleMeasure::Radian => Expr::from_int(2) * Const::Pi.into(),

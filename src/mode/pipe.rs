@@ -7,7 +7,7 @@ use std::{
     process::{self, Stdio},
 };
 
-use super::Mode;
+use super::{Mode, Status};
 
 impl<'a> State<'a> {
     /// Execute the command entered in pipe mode.
@@ -65,11 +65,13 @@ impl<'a> State<'a> {
     }
 
     /// Process a keypress in pipe mode.
-    pub fn pipe_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
+    pub fn pipe_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
             KeyCode::Char(c) => self.input.push(c),
             KeyCode::Enter => {
-                self.execute_pipe().context("couldn't execute command")?;
+                if let Err(e) = self.execute_pipe() {
+                    self.err = Some(SoftError::CmdIoErr(e));
+                }
 
                 if self.err.is_none() {
                     self.input.clear();
@@ -90,6 +92,6 @@ impl<'a> State<'a> {
             _ => (),
         }
 
-        Ok(false)
+        Status::Render
     }
 }

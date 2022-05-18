@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter, self};
 
+/// The configuration stored in `State` which will be read from a config file in the future.
 pub struct Config {
+    /// The angle measure that will be used for trig operations.
     pub angle_measure: AngleMeasure,
 }
 
@@ -13,16 +15,36 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A unit of angle
 pub enum AngleMeasure {
+    /// 1/(2π) turn.
     Radian,
+
+    /// 1 turn.
     Turn,
+
+    /// 1/400 turn.
     Gradian,
+
+    /// 1/360 turn.
     Degree,
+
+    /// 1/21600 turn.
     Minute,
+
+    /// 1/1296000 turn.
     Second,
+
+    /// 1/256 turn.
     BinaryDegree,
+
+    /// 1/24 turn.
     HourAngle,
+
+    /// 1/32 turn.
     Point,
+
+    /// 1/6400 turn.
     NatoMil,
 }
 

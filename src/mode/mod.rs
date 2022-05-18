@@ -18,11 +18,35 @@ mod normal;
 mod pipe;
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+/// The status returned by a mode funcion when it ticks a keypress.
+pub enum Status {
+    /// The state has changed, and needs to be rendered again.
+    Render,
+
+    /// The user has requested that `guac` exit.
+    Exit,
+
+    #[cfg(debug_assertions)]
+    /// Debug stuff; this shouldn't compile in release.
+    Debug,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+/// A mode that `guac` can be in. All modes interpret keypresses differently.
 pub enum Mode {
+    /// The default mode, in which the user can manipulate the stack, perform mathematical operations, and type in numbers.
     Normal,
+
+    /// The mode in which the user can push one of several math & physics constants to the stack.
     Constant,
+
+    /// The mode for pushing constants which are the mass of things.
     MassConstant,
+
+    /// The mode in which the user can type in a custom variable name.
     Variable,
+
+    /// The mode in which the user can type in a command into whose stdin the selected (or topmost) expression will be piped.
     Pipe,
 }
 
@@ -39,6 +63,17 @@ impl Display for Mode {
 }
 
 impl<'a> State<'a> {
+    /// Handle a key event by matching on the current mode.
+    pub fn handle_keypress(&mut self, kev: KeyEvent) -> Status {
+        match self.mode {
+            Mode::Normal => self.normal_mode(kev),
+            Mode::Constant => self.constant_mode(kev),
+            Mode::MassConstant => self.mass_constant_mode(kev),
+            Mode::Variable => self.variable_mode(kev),
+            Mode::Pipe => self.pipe_mode(kev),
+        }
+    }
+
     /// Write the given mode name on the modeline.
     pub fn write_modeline(&mut self) -> Result<()> {
         let (width, height) = terminal::size().context("couldn't get terminal size")?;
@@ -89,7 +124,7 @@ impl<'a> State<'a> {
     }
 
     /// Constant mode: push a `Const` to the stack.
-    pub fn constant(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
+    pub fn constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
             Char('p') => self.push_expr(Expr::Const(Const::Pi)),
             Char('e') => self.push_expr(Expr::Const(Const::E)),
@@ -99,10 +134,7 @@ impl<'a> State<'a> {
             Char('k') => self.push_expr(Expr::Const(Const::K)),
             Char('m') => {
                 self.mode = Mode::MassConstant;
-                return Ok(false);
-            }
-            Char('q') => {
-                return Ok(true);
+                return Status::Render;
             }
             Char('H') => self.push_expr(Expr::Const(Const::Hbar)),
             Char('G') => self.push_expr(Expr::Const(Const::G)),
@@ -112,27 +144,24 @@ impl<'a> State<'a> {
 
         self.mode = Mode::Normal;
 
-        Ok(false)
+        Status::Render
     }
 
     /// Mass constant mode: sub-mode of constant mode for physical constants which represent the mass of certain particles.
-    pub fn mass_constant(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
+    pub fn mass_constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
             Char('e') => self.push_expr(Expr::Const(Const::Me)),
             Char('p') => self.push_expr(Expr::Const(Const::Mp)),
-            Char('q') => {
-                return Ok(true);
-            }
             _ => (),
         }
 
         self.mode = Mode::Normal;
 
-        Ok(false)
+        Status::Render
     }
 
     /// Variable mode: allows the user to freely type in a custom variable name without triggering single-letter keybinds
-    pub fn variable(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
+    pub fn variable_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
             Enter | Char(' ') => {
                 self.push_var();
@@ -151,6 +180,6 @@ impl<'a> State<'a> {
             _ => (),
         }
 
-        Ok(false)
+        Status::Render
     }
 }

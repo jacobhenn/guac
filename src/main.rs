@@ -16,9 +16,11 @@ pub mod expr;
 
 mod args;
 
-mod config;
+/// Structures into which configuration is parsed.
+pub mod config;
 
-mod mode;
+/// Types and functions for keeping track of and executing modes.
+pub mod mode;
 
 #[cfg(test)]
 mod tests;
@@ -36,7 +38,7 @@ use crossterm::{
     tty::IsTty,
     ExecutableCommand, QueueableCommand,
 };
-use mode::Mode;
+use mode::{Mode, Status};
 use num::{traits::Pow, BigInt, BigRational, Signed};
 use std::{
     fmt::Display,
@@ -75,6 +77,9 @@ pub enum SoftError {
     /// The command entered in pipe mode failed. The first arg is the name of the command. If it printed to stderr, the second arg contains the first line. If not, it is the `ExitStatus` it returned.
     CmdFailed(String, String),
 
+    /// The command entered in pipe mode spawned successfully, but an IO error occurred while attempting to manipulate it.
+    CmdIoErr(anyhow::Error),
+
     /// This error should never be thrown in a release. It's just used to debug certain things.
     #[cfg(debug_assertions)]
     Debug(String),
@@ -93,10 +98,11 @@ impl Display for SoftError {
                 if e.kind() == ErrorKind::NotFound {
                     write!(f, "E6: unknown command")
                 } else {
-                    write!(f, "E6: bad command: {e}")
+                    write!(f, "E7: bad command: {e}")
                 }
             }
-            Self::CmdFailed(s, e) => write!(f, "E7: {s}: {e}"),
+            Self::CmdFailed(s, e) => write!(f, "E8: {s}: {e}"),
+            Self::CmdIoErr(e) => write!(f, "E9: cmd io err: {e}"),
             #[cfg(debug_assertions)]
             Self::Debug(s) => write!(f, "DEBUG: {s}"),
         }
@@ -226,7 +232,10 @@ impl<'a> State<'a> {
     }
 
     fn push_expr(&mut self, expr: Expr) {
-        self.stack.insert(self.select_idx.unwrap_or(self.stack.len()), StackItem::new(false, expr));
+        self.stack.insert(
+            self.select_idx.unwrap_or(self.stack.len()),
+            StackItem::new(false, expr),
+        );
         if let Some(i) = &mut self.select_idx {
             *i += 1;
         }
@@ -425,6 +434,29 @@ impl<'a> State<'a> {
         }
     }
 
+    /// One tick of the event loop. Returns `Ok(true)` if the user exited.
+    fn tick(&mut self) -> Result<bool, Error> {
+        self.err = None;
+
+        // Read the next event from the terminal.
+        if let Event::Key(kev) = event::read().context("couldn't get next terminal event")? {
+            match self.handle_keypress(kev) {
+                Status::Render => {
+                    self.write_modeline().context("couldn't write modeline")?;
+                    self.render().context("couldn't render the state")?;
+                }
+                Status::Exit => {
+                    return Ok(true);
+                }
+                Status::Debug => {
+                    bail!("debugging err handling");
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
     fn start(&mut self) -> Result<(), Error> {
         let (cx, cy) = cursor::position().context("couldn't get cursor position")?;
         let (.., height) = terminal::size().context("couldn't get terminal size")?;
@@ -437,29 +469,28 @@ impl<'a> State<'a> {
                 .context("couldn't move cursor")?;
         }
 
-        loop {
-            self.write_modeline().context("couldn't write modeline")?;
-            self.render().context("couldn't render the state")?;
-            self.err = None;
+        self.write_modeline().context("couldn't write modeline")?;
+        self.render().context("couldn't render the state")?;
 
-            // Read the next event from the terminal.
-            if let Event::Key(k) = event::read().context("couldn't get next terminal event")? {
-                if match self.mode {
-                    Mode::Normal => self.normal(k),
-                    Mode::Constant => self.constant(k),
-                    Mode::MassConstant => self.mass_constant(k),
-                    Mode::Variable => self.variable(k),
-                    Mode::Pipe => self.pipe_mode(k),
+        match loop {
+            match self.tick() {
+                Ok(false) => (),
+                Ok(true) => break Ok(()),
+                Err(e) => break Err(e),
+            }
+        } {
+            Ok(_) => {
+                self.cleanup()
+                    .context("couldn't clean up after event loop")?;
+            }
+            Err(e) => {
+                if self.cleanup().is_err() {
+                    println!("\n\r\n\r");
                 }
-                .context("couldn't tick the current mode")?
-                {
-                    break;
-                }
+
+                eprintln!("{}{} {e:#}", "error".bold().red(), ":".bold());
             }
         }
-
-        self.cleanup()
-            .context("couldn't clean up after event loop")?;
 
         Ok(())
     }
@@ -470,7 +501,7 @@ fn guac_interactive(anyway: bool) -> Result<(), Error> {
     let stdout = stdout.lock();
 
     if !anyway && !stdout.is_tty() {
-        bail!("stdout is not a tty. if you want to pipe an expression out of `guac`, see the `|` entry in `guac keys`. if you know what you're doing, use `guac anyway` to run anyway.");
+        bail!("stdout is not a tty. use `guac anyway` to run anyway.");
     }
 
     terminal::enable_raw_mode().context("couldn't enable raw mode")?;
@@ -518,12 +549,11 @@ fn main() {
     match go() {
         Ok(_) => (),
         Err(e) => {
-            terminal::disable_raw_mode().unwrap();
-            let mut chain = e.chain();
-            eprintln!("{}{}", "error: ".red().bold(), chain.next().unwrap());
-            for cause in chain {
-                eprintln!("\ncaused by: {}", cause);
+            if terminal::disable_raw_mode().is_err() {
+                println!("\n\r\n\r");
             }
+
+            eprintln!("{}{} {e:#}", "error".bold().red(), ":".bold());
         }
     }
 }

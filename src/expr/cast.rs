@@ -19,6 +19,7 @@ impl Expr {
 impl TryFrom<Expr> for f64 {
     type Error = ();
 
+    #[allow(clippy::use_self)]
     fn try_from(value: Expr) -> Result<Self, Self::Error> {
         match value {
             Expr::Num(n) => n.to_f64().ok_or(()),
@@ -34,9 +35,15 @@ impl TryFrom<Expr> for f64 {
             Expr::Sin(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.sin()),
             Expr::Cos(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.cos()),
             Expr::Tan(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.tan()),
-            Expr::Asin(x, m) => Ok((x.to_f64()?.asin() / std::f64::consts::TAU) * m.full_turn().to_f64()?),
-            Expr::Acos(x, m) => Ok((x.to_f64()?.acos() / std::f64::consts::TAU) * m.full_turn().to_f64()?),
-            Expr::Atan(x, m) => Ok((x.to_f64()?.atan() / std::f64::consts::TAU) * m.full_turn().to_f64()?),
+            Expr::Asin(x, m) => {
+                Ok((x.to_f64()?.asin() / std::f64::consts::TAU) * m.full_turn().to_f64()?)
+            }
+            Expr::Acos(x, m) => {
+                Ok((x.to_f64()?.acos() / std::f64::consts::TAU) * m.full_turn().to_f64()?)
+            }
+            Expr::Atan(x, m) => {
+                Ok((x.to_f64()?.atan() / std::f64::consts::TAU) * m.full_turn().to_f64()?)
+            }
             Expr::Var(_) => Err(()),
         }
     }

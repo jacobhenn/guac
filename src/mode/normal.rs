@@ -1,22 +1,18 @@
-use std::ops::Neg;
-
-use anyhow::Result;
+use super::{Mode, Status};
+use crate::{
+    expr::{constant::Const, Expr},
+    SoftError, State, RADIX,
+};
 use crossterm::event::{KeyCode, KeyEvent};
 use num::{
     traits::{Inv, Pow},
     One, Signed, Zero,
 };
-
-use crate::{
-    expr::{constant::Const, Expr},
-    SoftError, State, RADIX,
-};
-
-use super::Mode;
+use std::ops::Neg;
 
 impl<'a> State<'a> {
     /// Process a keypress in normal mode.
-    pub fn normal(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<bool> {
+    pub fn normal_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
             KeyCode::Char(c)
                 if self.select_idx.is_none() && !self.eex && (c.is_digit(RADIX) || c == '.') =>
@@ -28,7 +24,7 @@ impl<'a> State<'a> {
             {
                 self.eex_input.push(c);
             }
-            KeyCode::Char('q') | KeyCode::Esc => return Ok(true),
+            KeyCode::Char('q') | KeyCode::Esc => return Status::Exit,
             KeyCode::Char(';') => self.toggle_approx(),
             KeyCode::Enter | KeyCode::Char(' ') => {
                 self.push_input();
@@ -145,9 +141,7 @@ impl<'a> State<'a> {
             }
             #[cfg(debug_assertions)]
             KeyCode::Char(']') => {
-                if let Some(e) = self.stack.last() {
-                    self.err = Some(SoftError::Debug(e.expr.is_negative().to_string()));
-                }
+                return Status::Debug;
             }
             KeyCode::Char('x') => self.push_expr(Expr::Var("x".to_string())),
             KeyCode::Char('k') => self.mode = Mode::Constant,
@@ -199,6 +193,6 @@ impl<'a> State<'a> {
             _ => (),
         }
 
-        Ok(false)
+        Status::Render
     }
 }

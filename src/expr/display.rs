@@ -43,7 +43,7 @@ impl Expr {
     }
 
     /// Represents its desired position in a product; i.e., coefficients have a higher priority than variables.
-    pub fn product_priority(&self) -> u8 {
+    pub const fn product_priority(&self) -> u8 {
         match self {
             Expr::Num(_) => 0,
             Expr::Power(_, _) => 2,

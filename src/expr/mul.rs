@@ -155,7 +155,7 @@ impl MulAssign for Expr {
 
         self.correct();
         if let Self::Product(ts) = self {
-            ts.sort_unstable_by_key(Expr::product_priority)
+            ts.sort_unstable_by_key(Self::product_priority);
         }
     }
 }
