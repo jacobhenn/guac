@@ -18,13 +18,19 @@ mod normal;
 mod pipe;
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
-/// The status returned by a mode funcion when it ticks a keypress.
+/// A message from the current mode to the event loop that tells it what to do.
 pub enum Status {
-    /// The state has changed, and needs to be rendered again.
+    /// The state has been changed, and needs to be rendered again.
     Render,
 
     /// The user has requested that `guac` exit.
     Exit,
+
+    /// The user pressed the `undo` key.
+    Undo,
+
+    /// The user pressed the `redo` key.
+    Redo,
 
     #[cfg(debug_assertions)]
     /// Debug stuff; this shouldn't compile in release.

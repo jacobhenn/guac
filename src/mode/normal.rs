@@ -161,8 +161,8 @@ impl<'a> State<'a> {
                 }
             }
             KeyCode::Char('e') => self.eex = true,
-            // KeyCode::Char('u') => self.undo(),
-            // KeyCode::Char('U') => self.redo(),
+            KeyCode::Char('u') => return Status::Undo,
+            KeyCode::Char('U') => return Status::Redo,
             KeyCode::Char('<') => {
                 if let Some(i) = &mut self.select_idx {
                     if *i != 0 {

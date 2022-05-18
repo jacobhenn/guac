@@ -42,7 +42,7 @@ use mode::{Mode, Status};
 use num::{traits::Pow, BigInt, BigRational, Signed};
 use std::{
     fmt::Display,
-    io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write},
+    io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write}, process::exit, mem,
 };
 
 const RADIX: u32 = 10;
@@ -143,6 +143,8 @@ impl Display for StackItem {
 /// The global state of the calculator.
 pub struct State<'a> {
     stack: Vec<StackItem>,
+    history: Vec<Vec<StackItem>>,
+    future: Vec<Vec<StackItem>>,
     input: String,
     eex_input: String,
     eex: bool,
@@ -422,8 +424,9 @@ impl<'a> State<'a> {
 
         if !bad_idxs.is_empty() {
             eprintln!(
-                "{} couldn't parse stdin (line{} {})",
-                "info:".cyan().bold(),
+                "{}{} couldn't parse stdin (line{} {})",
+                "info".bold().cyan(),
+                ":".bold(),
                 if bad_idxs.len() == 1 { "" } else { "s" },
                 bad_idxs
                     .iter()
@@ -434,27 +437,56 @@ impl<'a> State<'a> {
         }
     }
 
-    /// One tick of the event loop. Returns `Ok(true)` if the user exited.
-    fn tick(&mut self) -> Result<bool, Error> {
-        self.err = None;
+    fn ev_loop(&mut self) -> Result<(), Error> {
+        loop {
+            self.err = None;
 
-        // Read the next event from the terminal.
-        if let Event::Key(kev) = event::read().context("couldn't get next terminal event")? {
-            match self.handle_keypress(kev) {
-                Status::Render => {
-                    self.write_modeline().context("couldn't write modeline")?;
-                    self.render().context("couldn't render the state")?;
-                }
-                Status::Exit => {
-                    return Ok(true);
-                }
-                Status::Debug => {
-                    bail!("debugging err handling");
+            // Read the next event from the terminal.
+            if let Event::Key(kev) = event::read().context("couldn't get next terminal event")? {
+                match self.handle_keypress(kev) {
+                    Status::Render => {
+                        self.write_modeline().context("couldn't write modeline")?;
+                        self.render().context("couldn't render the state")?;
+                        if let Some(old_stack) = self.history.last() {
+                            if &self.stack != old_stack {
+                                self.future.clear();
+                                self.history.push(self.stack.clone());
+                            }
+                        } else {
+                            self.future.clear();
+                            self.history.push(self.stack.clone());
+                        }
+                    }
+                    Status::Exit => {
+                        break;
+                    }
+                    Status::Undo => {
+                        if self.future.is_empty() {
+                            self.history.pop();
+                        }
+
+                        if let Some(mut old_stack) = self.history.pop() {
+                            mem::swap(&mut old_stack, &mut self.stack);
+                            self.future.push(old_stack);
+                        }
+
+                        self.render().context("couldn't render the state")?;
+                    }
+                    Status::Redo => {
+                        if let Some(mut new_stack) = self.future.pop() {
+                            mem::swap(&mut new_stack, &mut self.stack);
+                            self.history.push(new_stack);
+                        }
+                        self.render().context("couldn't render the state")?;
+                    }
+                    Status::Debug => {
+                        bail!("debugging err handling");
+                    }
                 }
             }
         }
 
-        Ok(false)
+        Ok(())
     }
 
     fn start(&mut self) -> Result<(), Error> {
@@ -472,13 +504,7 @@ impl<'a> State<'a> {
         self.write_modeline().context("couldn't write modeline")?;
         self.render().context("couldn't render the state")?;
 
-        match loop {
-            match self.tick() {
-                Ok(false) => (),
-                Ok(true) => break Ok(()),
-                Err(e) => break Err(e),
-            }
-        } {
+        match self.ev_loop() {
             Ok(_) => {
                 self.cleanup()
                     .context("couldn't clean up after event loop")?;
@@ -508,8 +534,8 @@ fn guac_interactive(anyway: bool) -> Result<(), Error> {
 
     let mut state = State {
         stack: Vec::new(),
-        // history: Vec::new(),
-        // future: Vec::new(),
+        history: Vec::new(),
+        future: Vec::new(),
         input: String::new(),
         eex_input: String::new(),
         eex: false,
@@ -554,6 +580,7 @@ fn main() {
             }
 
             eprintln!("{}{} {e:#}", "error".bold().red(), ":".bold());
+            exit(1);
         }
     }
 }
