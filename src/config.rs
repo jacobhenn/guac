@@ -1,15 +1,21 @@
-use std::fmt::{Display, Formatter, self};
+use std::{fmt::{Display, Formatter, self}, str::FromStr};
+
+use crate::radix::{self, Radix};
 
 /// The configuration stored in `State` which will be read from a config file in the future.
 pub struct Config {
     /// The angle measure that will be used for trig operations.
     pub angle_measure: AngleMeasure,
+
+    /// The "default" radix in which numbers will be inputted or displayed.
+    pub radix: Radix,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             angle_measure: AngleMeasure::Radian,
+            radix: radix::DECIMAL,
         }
     }
 }
@@ -61,6 +67,26 @@ impl Display for AngleMeasure {
             AngleMeasure::HourAngle => write!(f, "hour"),
             AngleMeasure::Point => write!(f, "point"),
             AngleMeasure::NatoMil => write!(f, "mil"),
+        }
+    }
+}
+
+impl FromStr for AngleMeasure {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "rad" => Ok(AngleMeasure::Radian),
+            "turns" => Ok(AngleMeasure::Turn),
+            "grad" => Ok(AngleMeasure::Gradian),
+            "deg" => Ok(AngleMeasure::Degree),
+            "min" => Ok(AngleMeasure::Minute),
+            "sec" => Ok(AngleMeasure::Second),
+            "bdeg" => Ok(AngleMeasure::BinaryDegree),
+            "hour" => Ok(AngleMeasure::HourAngle),
+            "point" => Ok(AngleMeasure::Point),
+            "mil" => Ok(AngleMeasure::NatoMil),
+            _ => Err(()),
         }
     }
 }

@@ -1,7 +1,7 @@
 use super::{Mode, Status};
 use crate::{
     expr::{constant::Const, Expr},
-    SoftError, State, RADIX,
+    SoftError, State,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use num::{
@@ -12,19 +12,34 @@ use std::ops::Neg;
 
 impl<'a> State<'a> {
     /// Process a keypress in normal mode.
-    pub fn normal_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
+    pub fn normal_mode(&mut self, KeyEvent { code, .. }: KeyEvent, escape_digits: bool) -> Status {
+        let radix = self.input_radix.unwrap_or(self.config.radix);
+
         match code {
             KeyCode::Char(c)
-                if self.select_idx.is_none() && !self.eex && (c.is_digit(RADIX) || c == '.') =>
+                if escape_digits
+                    && self.select_idx.is_none()
+                    && self.eex_input.is_none()
+                    && (radix.contains_digit(&c) || c == '.') =>
             {
                 self.input.push(c);
             }
             KeyCode::Char(c)
-                if self.select_idx.is_none() && self.eex && (c.is_digit(RADIX) || c == '-') =>
+                if escape_digits
+                    && self.select_idx.is_none()
+                    && self.eex_input.is_some()
+                    && (radix.contains_digit(&c) || c == '-') =>
             {
-                self.eex_input.push(c);
+                self.eex_input.get_or_insert(String::new()).push(c);
             }
-            KeyCode::Char('q') | KeyCode::Esc => return Status::Exit,
+            KeyCode::Char('q') => return Status::Exit,
+            KeyCode::Esc => {
+                if escape_digits {
+                    self.mode = Mode::Normal;
+                } else {
+                    return Status::Exit;
+                }
+            }
             KeyCode::Char(';') => self.toggle_approx(),
             KeyCode::Enter | KeyCode::Char(' ') => {
                 self.push_input();
@@ -37,11 +52,11 @@ impl<'a> State<'a> {
             }
             KeyCode::Backspace => match &mut self.select_idx {
                 None => {
-                    if self.eex {
-                        if self.eex_input.is_empty() {
-                            self.eex = false;
+                    if let Some(eex_input) = &mut self.eex_input {
+                        if eex_input.is_empty() {
+                            self.eex_input = None;
                         } else {
-                            self.eex_input.pop();
+                            eex_input.pop();
                         }
                     } else if self.input.is_empty() {
                         self.drop();
@@ -141,14 +156,14 @@ impl<'a> State<'a> {
             }
             #[cfg(debug_assertions)]
             KeyCode::Char(']') => {
-                return Status::Debug;
+                self.input = "set angle_measure bdeg".to_string();
+                self.exec_cmd();
             }
-            KeyCode::Char('x') => self.push_expr(Expr::Var("x".to_string())),
+            KeyCode::Char('x') => self.push_expr(Expr::Var("x".to_string()), self.config.radix),
             KeyCode::Char('k') => self.mode = Mode::Constant,
             KeyCode::Char('v') => {
                 self.input.clear();
-                self.eex_input.clear();
-                self.eex = false;
+                self.eex_input = None;
                 self.select_idx = None;
                 self.mode = Mode::Variable;
             }
@@ -160,7 +175,12 @@ impl<'a> State<'a> {
                     self.mode = Mode::Pipe;
                 }
             }
-            KeyCode::Char('e') => self.eex = true,
+            KeyCode::Char('i') => self.mode = Mode::Insert,
+            KeyCode::Char('e') => self.eex_input = Some(String::new()),
+            KeyCode::Char('#') => {
+                self.radix_input.get_or_insert(String::new());
+                self.mode = Mode::Radix;
+            }
             KeyCode::Char('u') => return Status::Undo,
             KeyCode::Char('U') => return Status::Redo,
             KeyCode::Char('<') => {
@@ -190,6 +210,22 @@ impl<'a> State<'a> {
                 |_, y| y.is_negative().then(|| SoftError::BadLog),
             ),
             KeyCode::Char('R') => self.apply_unary(|x| x.pow(2.into()), |_| None),
+            KeyCode::Char(c)
+                if !escape_digits
+                    && self.select_idx.is_none()
+                    && self.eex_input.is_none()
+                    && (radix.contains_digit(&c) || c == '.') =>
+            {
+                self.input.push(c);
+            }
+            KeyCode::Char(c)
+                if !escape_digits
+                    && self.select_idx.is_none()
+                    && self.eex_input.is_some()
+                    && (radix.contains_digit(&c) || c == '-') =>
+            {
+                self.eex_input.get_or_insert(String::new()).push(c);
+            }
             _ => (),
         }
 

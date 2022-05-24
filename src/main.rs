@@ -14,19 +14,26 @@
 /// Provides the `Expr` type and various methods for working with it
 pub mod expr;
 
-mod args;
-
 /// Structures into which configuration is parsed.
 pub mod config;
 
 /// Types and functions for keeping track of and executing modes.
 pub mod mode;
 
+/// Types and functions for executing in-guac commands.
+pub mod cmd;
+
+/// Types and functions for parsing and displaying radices.
+pub mod radix;
+
+mod args;
+
 #[cfg(test)]
 mod tests;
 
 use crate::args::Args;
 use crate::expr::Expr;
+use crate::radix::Radix;
 use anyhow::{bail, Context, Error};
 use args::SubCommand;
 use colored::Colorize;
@@ -39,15 +46,13 @@ use crossterm::{
     ExecutableCommand, QueueableCommand,
 };
 use mode::{Mode, Status};
-use num::{traits::Pow, BigInt, BigRational, Signed};
+use num::{traits::Pow, BigRational};
 use std::{
     fmt::Display,
     io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write},
     mem,
     process::exit,
 };
-
-const RADIX: u32 = 10;
 
 const RADIX_POW_SIX: u32 = 1_000_000;
 
@@ -67,6 +72,9 @@ pub enum SoftError {
     /// Eex input (input after the `e` in e-notation) could not be parsed.
     BadEex,
 
+    /// Radix input (input before the `#` in `guac` radix notation) could not be parsed.
+    BadRadix,
+
     /// The argument of `tan` was not in its domain.
     BadTan,
 
@@ -74,13 +82,28 @@ pub enum SoftError {
     BadLog,
 
     /// The command entered in pipe mode could not be run; it returned this IO error.
-    BadCmd(io::Error),
+    BadSysCmd(io::Error),
 
     /// The command entered in pipe mode failed. The first arg is the name of the command. If it printed to stderr, the second arg contains the first line. If not, it is the `ExitStatus` it returned.
-    CmdFailed(String, String),
+    SysCmdFailed(String, String),
 
     /// The command entered in pipe mode spawned successfully, but an IO error occurred while attempting to manipulate it.
-    CmdIoErr(anyhow::Error),
+    SysCmdIoErr(anyhow::Error),
+
+    /// The command entered in command mode was not recognized.
+    UnknownGuacCmd(String),
+
+    /// The command entered in command mode was missing an argument.
+    GuacCmdMissingArg,
+
+    /// The command entered in command mode had too many arguments.
+    GuacCmdExtraArg,
+
+    /// The path provided to the `set` command was bad.
+    BadSetPath(String),
+
+    /// The value provided to the `set` command could not be parsed.
+    BadSetVal(String),
 
     /// This error should never be thrown in a release. It's just used to debug certain things.
     #[cfg(debug_assertions)]
@@ -90,21 +113,27 @@ pub enum SoftError {
 impl Display for SoftError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DivideByZero => write!(f, "E0: divide by zero"),
-            Self::Complex => write!(f, "E1: complex not yet supported"),
-            Self::BadInput => write!(f, "E2: bad input"),
-            Self::BadEex => write!(f, "E3: bad eex input"),
-            Self::BadTan => write!(f, "E4: tangent of π/2"),
-            Self::BadLog => write!(f, "E5: log of n ≤ 0"),
-            Self::BadCmd(e) => {
+            Self::DivideByZero => write!(f, "E00: divide by zero"),
+            Self::Complex => write!(f, "E01: complex not yet supported"),
+            Self::BadInput => write!(f, "E02: bad input"),
+            Self::BadEex => write!(f, "E03: bad eex input"),
+            Self::BadRadix => write!(f, "E04: bad radix"),
+            Self::BadTan => write!(f, "E05: tangent of π/2"),
+            Self::BadLog => write!(f, "E06: log of n ≤ 0"),
+            Self::BadSysCmd(e) => {
                 if e.kind() == ErrorKind::NotFound {
-                    write!(f, "E6: unknown command")
+                    write!(f, "E07: unknown command")
                 } else {
-                    write!(f, "E7: bad command: {e}")
+                    write!(f, "E08: bad command: {e}")
                 }
             }
-            Self::CmdFailed(s, e) => write!(f, "E8: {s}: {e}"),
-            Self::CmdIoErr(e) => write!(f, "E9: cmd io err: {e}"),
+            Self::SysCmdFailed(s, e) => write!(f, "E09: {s}: {e}"),
+            Self::SysCmdIoErr(e) => write!(f, "E10: cmd io err: {e}"),
+            Self::UnknownGuacCmd(s) => write!(f, "E11: unknown cmd {s}"),
+            Self::GuacCmdMissingArg => write!(f, "E12: cmd missing arg"),
+            Self::GuacCmdExtraArg => write!(f, "E13: too many cmd args"),
+            Self::BadSetPath(p) => write!(f, "E14: no such setting `{p}`",),
+            Self::BadSetVal(v) => write!(f, "E15: couldnt parse `{v}`",),
             #[cfg(debug_assertions)]
             Self::Debug(s) => write!(f, "DEBUG: {s}"),
         }
@@ -114,18 +143,20 @@ impl Display for SoftError {
 /// An expression, along with other data necessary for displaying it but not for doing math with it.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StackItem {
-    approx: bool,
     expr: Expr,
+    radix: Radix,
+    approx: bool,
     exact_str: String,
     approx_str: String,
 }
 
 impl StackItem {
     /// Create a new `StackItem` and cache its rendered strings.
-    pub fn new(approx: bool, expr: Expr) -> Self {
+    pub fn new(approx: bool, expr: Expr, radix: Radix) -> Self {
         Self {
-            approx,
             expr: expr.clone(),
+            radix,
+            approx,
             exact_str: expr.clone().to_string(),
             approx_str: expr.display_approx(),
         }
@@ -145,19 +176,80 @@ impl Display for StackItem {
 /// The global state of the calculator.
 pub struct State<'a> {
     stack: Vec<StackItem>,
+
+    /// A list of past stacks.
     history: Vec<Vec<StackItem>>,
+
+    /// A list of stacks that have been undone.
     future: Vec<Vec<StackItem>>,
+
+    /// The current text in the input field.
     input: String,
-    eex_input: String,
-    eex: bool,
+
+    /// The current text in the input field after "ᴇ".
+    eex_input: Option<String>,
+
+    /// The current text in the input field before "#".
+    radix_input: Option<String>,
+
+    /// The current local radix in the input field. If `self.radix_input` is empty or invalid, this should be `None`.
+    input_radix: Option<Radix>,
+
+    /// The soft error currently displaying on the modeline.
     err: Option<SoftError>,
+
     mode: Mode,
+
+    /// The index of the selected item on the stack, or `None` if the input is selected.
     select_idx: Option<usize>,
+
     config: Config,
+
     stdout: StdoutLock<'a>,
 }
 
 impl<'a> State<'a> {
+    fn new(stdout: StdoutLock<'a>, config: Config) -> Self {
+        Self {
+            stack: Vec::new(),
+            history: Vec::new(),
+            future: Vec::new(),
+            input: String::new(),
+            eex_input: None,
+            radix_input: None,
+            input_radix: None,
+            err: None,
+            mode: Mode::Normal,
+            select_idx: None,
+            config,
+            stdout,
+        }
+    }
+
+    /// Return the index of the selected item, or the last item if none are selected.
+    fn selected_or_last_idx(&self) -> Option<usize> {
+        if let Some(i) = self.select_idx {
+            Some(i)
+        } else {
+            self.stack.len().checked_sub(1)
+        }
+    }
+
+    fn display_stack_item(&self, stack_item: &StackItem) -> String {
+        let mut s = String::new();
+        let radix = stack_item.radix;
+        if radix != self.config.radix {
+            s.push_str(stack_item.radix.abbv());
+            s.push('#');
+        }
+
+        match &stack_item.expr {
+            Expr::Num(n) => s.push_str(&radix.display_bigrational(&n)),
+            expr => s.push_str(&expr.to_string()),
+        }
+        s
+    }
+
     fn render(&mut self) -> Result<(), Error> {
         let (_, cy) = cursor::position().context("couldn't get cursor pos")?;
         self.stdout
@@ -170,12 +262,12 @@ impl<'a> State<'a> {
         let mut len: usize = 0;
         let mut selected_pos = None;
         for i in 0..self.stack.len() {
-            let stack_item = &mut self.stack[i];
+            let stack_item = &self.stack[i];
 
             let expr_str = if option_env!("GUAC_DEBUG") == Some("true") {
                 format!("{:?}", stack_item.expr)
             } else {
-                stack_item.to_string()
+                self.display_stack_item(stack_item)
             };
 
             if Some(i) == self.select_idx {
@@ -193,12 +285,17 @@ impl<'a> State<'a> {
             len += 1;
         }
 
+        if let Some(radix_input) = &self.radix_input {
+            s.push_str(radix_input);
+            s.push('#');
+            len += radix_input.len() + 1;
+        }
+
         let input = self.input.to_string();
         len += input.len();
         s.push_str(&input);
 
-        if self.eex {
-            let eex_input = self.eex_input.to_string();
+        if let Some(eex_input) = &self.eex_input {
             len += eex_input.len() + 1;
             s.push('ᴇ');
             s.push_str(&eex_input);
@@ -235,10 +332,10 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    fn push_expr(&mut self, expr: Expr) {
+    fn push_expr(&mut self, expr: Expr, radix: Radix) {
         self.stack.insert(
             self.select_idx.unwrap_or(self.stack.len()),
-            StackItem::new(false, expr),
+            StackItem::new(false, expr, radix),
         );
         if let Some(i) = &mut self.select_idx {
             *i += 1;
@@ -258,38 +355,69 @@ impl<'a> State<'a> {
     }
 
     fn push_input(&mut self) -> bool {
-        let input = self.input.parse::<Expr>();
-        if let Ok(expr) = input {
-            if let Ok(eex) = self.eex_input.parse::<BigInt>() {
-                self.input.clear();
-                self.eex_input.clear();
-                self.stack.push(StackItem::new(
-                    self.input.contains('.') || eex.is_negative(),
-                    expr * Expr::from_int(RADIX).pow(Expr::Num(BigRational::from(eex))),
-                ));
-                self.eex = false;
-                true
-            } else if self.eex {
-                self.err = Some(SoftError::BadEex);
-                false
-            } else {
-                self.input.clear();
-                self.stack
-                    .push(StackItem::new(self.input.contains('.'), expr));
-                true
+        if self.input.is_empty() {
+            if self.input_radix == None {
+                return false;
+            } else if let Some(i) = self.selected_or_last_idx() {
+                if let Some(x) = self.stack.get_mut(i) {
+                    x.radix = self.input_radix.unwrap_or(self.config.radix);
+                }
+
+                self.input_radix = None;
+                self.radix_input = None;
+                if self.config.radix > radix::DECIMAL {
+                    self.mode = Mode::Insert;
+                } else {
+                    self.mode = Mode::Normal;
+                }
+
+                return false;
             }
-        } else if !self.input.is_empty() || !self.eex_input.is_empty() {
-            self.err = Some(SoftError::BadInput);
-            false
-        } else {
-            false
         }
+
+        let radix = self.input_radix.unwrap_or(self.config.radix);
+        let mut expr;
+
+        if let Some(int) = radix.parse_bigint(&self.input) {
+            let num = Expr::Num(BigRational::from(int));
+            expr = num;
+        } else  {
+            self.err = Some(SoftError::BadInput);
+            return false;
+        }
+
+        if let Some(eex_input) = &self.eex_input {
+            if let Some(int) = radix.parse_bigint(eex_input) {
+                let exponent = Expr::Num(BigRational::from(int));
+                let factor = Expr::from(radix).pow(exponent);
+                expr *= factor;
+            } else {
+                self.err = Some(SoftError::BadEex);
+                return false;
+            }
+        }
+
+        self.push_expr(expr, radix);
+        self.input = String::new();
+        self.eex_input = None;
+        self.radix_input = None;
+        self.input_radix = None;
+        if self.config.radix > radix::DECIMAL {
+            self.mode = Mode::Insert;
+        } else {
+            self.mode = Mode::Normal;
+        }
+
+        true
     }
 
     fn push_var(&mut self) {
         if !self.input.is_empty() {
-            self.stack
-                .push(StackItem::new(false, Expr::Var(self.input.clone())));
+            self.stack.push(StackItem::new(
+                false,
+                Expr::Var(self.input.clone()),
+                self.input_radix.unwrap_or(self.config.radix),
+            ));
             self.input.clear();
         }
     }
@@ -319,9 +447,15 @@ impl<'a> State<'a> {
             } else {
                 let x = self.stack.remove(idx - 1);
                 let y = self.stack.remove(idx - 1);
+                let radix = if x.radix == self.config.radix || y.radix == self.config.radix {
+                    self.config.radix
+                } else {
+                    y.radix
+                };
+
                 self.stack.insert(
                     idx - 1,
-                    StackItem::new(x.approx || y.approx, f(x.expr, y.expr)),
+                    StackItem::new(x.approx || y.approx, f(x.expr, y.expr), radix),
                 );
 
                 if let Some(i) = self.select_idx.as_mut() {
@@ -353,7 +487,7 @@ impl<'a> State<'a> {
                 }
             } else {
                 let x = self.stack.remove(idx);
-                self.stack.insert(idx, StackItem::new(x.approx, f(x.expr)));
+                self.stack.insert(idx, StackItem::new(x.approx, f(x.expr), x.radix));
             }
         }
     }
@@ -370,9 +504,10 @@ impl<'a> State<'a> {
     }
 
     fn swap(&mut self) {
-        let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
-        if idx > 0 {
-            self.stack.swap(idx - 1, idx);
+        if let Some(idx) = self.selected_or_last_idx() {
+            if idx > 0 {
+                self.stack.swap(idx - 1, idx);
+            }
         }
     }
 
@@ -398,7 +533,7 @@ impl<'a> State<'a> {
             idx += 1;
             let line: String = line.chars().filter(|c| !c.is_whitespace()).collect();
             if let Ok(e) = line.parse::<Expr>() {
-                self.push_expr(e);
+                self.push_expr(e, self.config.radix);
             } else {
                 bad_idxs.push(idx);
             }
@@ -470,6 +605,8 @@ impl<'a> State<'a> {
     }
 
     fn start(&mut self) -> Result<(), Error> {
+        terminal::enable_raw_mode().context("couldn't enable raw mode")?;
+
         let (cx, cy) = cursor::position().context("couldn't get cursor position")?;
         let (.., height) = terminal::size().context("couldn't get terminal size")?;
 
@@ -518,21 +655,8 @@ fn guac_interactive(force: bool) -> Result<(), Error> {
         }
     }
 
-    terminal::enable_raw_mode().context("couldn't enable raw mode")?;
-
-    let mut state = State {
-        stack: Vec::new(),
-        history: Vec::new(),
-        future: Vec::new(),
-        input: String::new(),
-        eex_input: String::new(),
-        eex: false,
-        err: None,
-        mode: Mode::Normal,
-        select_idx: None,
-        config: Config::default(),
-        stdout,
-    };
+    let config = Config::default();
+    let mut state = State::new(stdout, config);
 
     state.init_from_stdin();
 

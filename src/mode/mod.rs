@@ -1,6 +1,7 @@
 use crate::{
     expr::{constant::Const, Expr},
-    State, RADIX,
+    radix::{self, Radix},
+    SoftError, State,
 };
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -41,7 +42,12 @@ pub enum Status {
 /// A mode that `guac` can be in. All modes interpret keypresses differently.
 pub enum Mode {
     /// The default mode, in which the user can manipulate the stack, perform mathematical operations, and type in numbers.
+    ///
+    /// Tries to interpret keys as binds before digits.
     Normal,
+
+    /// Tries to interpret keys as digits before binds.
+    Insert,
 
     /// The mode in which the user can push one of several math & physics constants to the stack.
     Constant,
@@ -54,16 +60,21 @@ pub enum Mode {
 
     /// The mode in which the user can type in a command into whose stdin the selected (or topmost) expression will be piped.
     Pipe,
+
+    /// The mode in which the user can type in a radix in which to input a number.
+    Radix,
 }
 
 impl Display for Mode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Normal => Ok(()),
+            Self::Insert => write!(f, "insert"),
             Self::Constant => write!(f, "enter constant"),
             Self::MassConstant => write!(f, "enter mass constant"),
             Self::Variable => write!(f, "enter variable"),
             Self::Pipe => write!(f, "enter command"),
+            Self::Radix => write!(f, "enter radix"),
         }
     }
 }
@@ -72,11 +83,13 @@ impl<'a> State<'a> {
     /// Handle a key event by matching on the current mode.
     pub fn handle_keypress(&mut self, kev: KeyEvent) -> Status {
         match self.mode {
-            Mode::Normal => self.normal_mode(kev),
+            Mode::Normal => self.normal_mode(kev, false),
+            Mode::Insert => self.normal_mode(kev, true),
             Mode::Constant => self.constant_mode(kev),
             Mode::MassConstant => self.mass_constant_mode(kev),
             Mode::Variable => self.variable_mode(kev),
             Mode::Pipe => self.pipe_mode(kev),
+            Mode::Radix => self.radix_mode(kev),
         }
     }
 
@@ -87,13 +100,14 @@ impl<'a> State<'a> {
         let (cx, cy) = cursor::position().context("couldn't get cursor pos")?;
 
         let line = format!(
-            "{} {} {} {}",
+            "{} {} {} {} {}",
             self.err
                 .as_ref()
                 .map(ToString::to_string)
                 .unwrap_or_default(),
             "(q: quit)",
             self.config.angle_measure,
+            self.config.radix,
             self.mode,
         );
 
@@ -102,7 +116,7 @@ impl<'a> State<'a> {
         }
 
         let colored_line = format!(
-            "{} {} {} {}",
+            "{} {} {} {} {}",
             self.err
                 .as_ref()
                 .map(ToString::to_string)
@@ -110,6 +124,7 @@ impl<'a> State<'a> {
                 .red(),
             "(q: quit)",
             self.config.angle_measure,
+            self.config.radix.to_string(),
             self.mode.to_string().yellow().bold(),
         );
 
@@ -132,19 +147,19 @@ impl<'a> State<'a> {
     /// Constant mode: push a `Const` to the stack.
     pub fn constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
-            Char('p') => self.push_expr(Expr::Const(Const::Pi)),
-            Char('e') => self.push_expr(Expr::Const(Const::E)),
-            Char('c') => self.push_expr(Expr::Const(Const::C)),
-            Char('g') => self.push_expr(Expr::Const(Const::Gamma)),
-            Char('h') => self.push_expr(Expr::Const(Const::H)),
-            Char('k') => self.push_expr(Expr::Const(Const::K)),
+            Char('p') => self.push_expr(Expr::Const(Const::Pi), self.config.radix),
+            Char('e') => self.push_expr(Expr::Const(Const::E), self.config.radix),
+            Char('c') => self.push_expr(Expr::Const(Const::C), self.config.radix),
+            Char('g') => self.push_expr(Expr::Const(Const::Gamma), self.config.radix),
+            Char('h') => self.push_expr(Expr::Const(Const::H), self.config.radix),
+            Char('k') => self.push_expr(Expr::Const(Const::K), self.config.radix),
             Char('m') => {
                 self.mode = Mode::MassConstant;
                 return Status::Render;
             }
-            Char('H') => self.push_expr(Expr::Const(Const::Hbar)),
-            Char('G') => self.push_expr(Expr::Const(Const::G)),
-            Char('E') => self.push_expr(Expr::Const(Const::Qe)),
+            Char('H') => self.push_expr(Expr::Const(Const::Hbar), self.config.radix),
+            Char('G') => self.push_expr(Expr::Const(Const::G), self.config.radix),
+            Char('E') => self.push_expr(Expr::Const(Const::Qe), self.config.radix),
             _ => (),
         }
 
@@ -156,8 +171,8 @@ impl<'a> State<'a> {
     /// Mass constant mode: sub-mode of constant mode for physical constants which represent the mass of certain particles.
     pub fn mass_constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
-            Char('e') => self.push_expr(Expr::Const(Const::Me)),
-            Char('p') => self.push_expr(Expr::Const(Const::Mp)),
+            Char('e') => self.push_expr(Expr::Const(Const::Me), self.config.radix),
+            Char('p') => self.push_expr(Expr::Const(Const::Mp), self.config.radix),
             _ => (),
         }
 
@@ -173,7 +188,7 @@ impl<'a> State<'a> {
                 self.push_var();
                 self.mode = Mode::Normal;
             }
-            Char(c) if !c.is_digit(RADIX) && !"*+-·/^%()".contains(c) => {
+            Char(c) if !self.config.radix.contains_digit(&c) && !"#*+-·/^%()".contains(c) => {
                 self.input.push(c);
             }
             Backspace => {
@@ -182,6 +197,56 @@ impl<'a> State<'a> {
             Esc => {
                 self.input.clear();
                 self.mode = Mode::Normal;
+            }
+            _ => (),
+        }
+
+        Status::Render
+    }
+
+    /// Radix mode: allows the user to type in a radix in which to input a number
+    pub fn radix_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
+        match code {
+            Enter | Char(' ') | Char('#') => {
+                if let Ok(radix) = self
+                    .radix_input
+                    .clone()
+                    .unwrap_or_default()
+                    .parse::<Radix>()
+                {
+                    self.input_radix = Some(radix);
+                    if radix > radix::DECIMAL {
+                        self.mode = Mode::Insert;
+                    } else {
+                        self.mode = Mode::Normal;
+                    }
+                } else if self.radix_input.as_ref().map(|s| s.is_empty()).unwrap_or_default() {
+                    self.radix_input = None;
+                    self.mode = Mode::Normal;
+                } else {
+                    self.err = Some(SoftError::BadRadix);
+                }
+            }
+            Char(c) if radix::DIGITS.contains(&c) => {
+                self.radix_input.get_or_insert(String::new()).push(c);
+            }
+            Backspace => {
+                if let Some(radix_input) = &mut self.radix_input {
+                    if radix_input.is_empty() {
+                        self.stack.pop();
+                    } else {
+                        radix_input.pop();
+                    }
+                }
+            }
+            Esc => {
+                self.radix_input = None;
+                self.input_radix = None;
+                if self.config.radix > radix::DECIMAL {
+                    self.mode = Mode::Insert;
+                } else {
+                    self.mode = Mode::Normal;
+                }
             }
             _ => (),
         }

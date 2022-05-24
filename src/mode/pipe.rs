@@ -45,7 +45,7 @@ impl<'a> State<'a> {
                     let status = child.wait().context("failed to get child's exit status")?;
                     if !status.success() {
                         let stderr = BufReader::new(stderr);
-                        self.err = Some(SoftError::CmdFailed(
+                        self.err = Some(SoftError::SysCmdFailed(
                             word.to_string(),
                             stderr
                                 .lines()
@@ -56,7 +56,7 @@ impl<'a> State<'a> {
                     }
                 }
                 Err(e) => {
-                    self.err = Some(SoftError::BadCmd(e));
+                    self.err = Some(SoftError::BadSysCmd(e));
                 }
             }
         }
@@ -70,7 +70,7 @@ impl<'a> State<'a> {
             KeyCode::Char(c) => self.input.push(c),
             KeyCode::Enter => {
                 if let Err(e) = self.execute_pipe() {
-                    self.err = Some(SoftError::CmdIoErr(e));
+                    self.err = Some(SoftError::SysCmdIoErr(e));
                 }
 
                 if self.err.is_none() {
