@@ -1,53 +1,54 @@
-- q: quit
-- [e\-.0-9]: type a number in the input (e for e-notation)
-- backspace
+- `q`: quit
+- digit, `.`, or `e`: type a number in the input (`e` for e-notation)
+- `#` enter radix mode (see wiki)
+- `backspace`
 	- if the input is selected and not empty, drop the last char
 	- if the input is selected but empty, drop the top of the stack
 	- else, drop the expression to the left of the selection
-- [\n ]: push the input to the stack
-- +: add
-- -: subtract
-- *: multiply
-- /: divide
-- `: reciprocal
-- ~: opposite
-- \: absolute value
-- d: drop the selected expression, or the topmost expression if the input is selected
-- ^: exponentiate
-- l: natural log
-- L: log with given base
-- r: square root
-- R: square
-- %: modulo
-- ;: toggle the topmost expression's display mode between exact and approximate
-- s: sine
-- c: cosine
-- t: tangent
-- x: push x
-- h: move selection to the left
-- l: move selection to the right
-- >: move selected expression to the right
-- <: move selected expression to the left
-- right: swap the selected expression (or the topmost one) with the expression to its left
-- a: cancel selection and jump to input
-- |: enter pipe mode
-    - any char: type a command (to be executed directly, **not** through your $SHELL)
-    - enter: pipe the selected expression (or the topmost one) to the entered command
-    - esc: cancel
-- v: enter variable mode
-    - [A-Za-z]: type in a custom variable name
-    - esc: cancel
-- k: enter constant mode
-    - p: pi
-    - e: e
-    - g: euler-mascheroni constant
-    - c: speed of light (m·s⁻¹)
-    - G: gravitational constant (m³·kg⁻¹·s⁻²)
-    - h: planck constant (J·Hz⁻¹)
-    - H: reduced planck constant (J·s)
-    - k: boltzmann constant (J·K⁻¹)
-    - E: elementary charge (C)
-    - m: mass of
-        - e: electron (kg)
-        - p: proton (kg)
-    - esc: cancel
+- `enter` or `space`: push the input to the stack
+- `+`: add
+- `-`: subtract
+- ``: multiply
+- `/`: divide
+- `` ` ``: reciprocal
+- `~`: opposite (by analogy to Vim's `~`)
+- `\`: absolute value (by proximity to `|`)
+- `d`: drop the selected expression, or the topmost expression if the input is selected
+- `^`: exponentiate
+- `g`: natural log
+- `G`: log with given base
+- `r`: square root
+- `R`: square
+- `%`: modulo
+- `;`: toggle the selected (or topmost) expression's display mode between exact and approximate
+- `s`: sine
+- `c`: cosine
+- `t`: tangent
+- `x`: push x
+- `h`: select to the left (by analogy to Vim's `h`)
+- `l`: select to the right (by analogy to Vim's `l`)
+- `>`: move selected expression to the right (by analogy to Vim's `>>`)
+- `<`: move selected expression to the left (by analogy to Vim's `<<`)
+- `right`: swap the selected expression (or the topmost one) with the expression to its left
+- `a`: cancel selection and jump to input (by analogy to Vim's `A`)
+- `|`: enter pipe mode
+    - `any char`: type a command (to be executed directly, not through your `$SHELL`)
+    - `enter`: pipe the selected expression (or the topmost one) to the entered command
+    - `esc`: cancel
+- `v`: enter variable mode
+    - `[A-Za-z]`: type in a custom variable name
+    - `esc`: cancel
+- `k`: enter constant mode
+    - `p`: pi
+    - `e`: e
+    - `g`: euler-mascheroni constant
+    - `c`: speed of light (m·s⁻¹)
+    - `G`: gravitational constant (m³·kg⁻¹·s⁻²)
+    - `h`: planck constant (J·Hz⁻¹)
+    - `H`: reduced planck constant (J·s)
+    - `k`: boltzmann constant (J·K⁻¹)
+    - `E`: elementary charge (C)
+    - `m`: mass of
+        - `e`: electron (kg)
+        - `p`: proton (kg)
+    - `esc`: cancel

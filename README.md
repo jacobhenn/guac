@@ -5,7 +5,7 @@
 ```
 $ guac
 x sqrt(π)/5 78█
-                                  (q: quit) rad
+                         (q: quit) rad
 ```
 
 ## install
@@ -25,12 +25,13 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 *see this list in the terminal by running* `guac keys`.
 
 - `q`: **q**uit
-- `[e\-.0-9]`: type a number in the input (`e` for e-notation)
+- digit, `.`, or `e`: type a number in the input (`e` for e-notation)
+- `#` enter radix mode (see wiki)
 - `backspace`
 	- if the input is selected and not empty, drop the last char
 	- if the input is selected but empty, drop the top of the stack
 	- else, drop the expression *to the left of the selection*
-- `[\n ]`: push the input to the stack
+- `enter` or `space`: push the input to the stack
 - `+`: add
 - `-`: subtract
 - `*`: multiply
@@ -40,8 +41,8 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 - `\`: absolute value (by proximity to `|`)
 - `d`: **d**rop the selected expression, or the topmost expression if the input is selected
 - `^`: exponentiate
-- `l`: natural **l**og
-- `L`: **l**og with given base
+- `g`: natural lo**g**
+- `G`: lo**g** with given base
 - `r`: square **r**oot
 - `R`: square
 - `%`: modulo
