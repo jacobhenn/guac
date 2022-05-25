@@ -26,7 +26,7 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 
 - `q`: **q**uit
 - digit, `.`, or `e`: type a number in the input (`e` for e-notation)
-- `#` enter radix mode (see wiki)
+- `#` enter radix mode (see the [wiki](https://github.com/jacobhenn/guac/wiki/radices))
 - `backspace`
 	- if the input is selected and not empty, drop the last char
 	- if the input is selected but empty, drop the top of the stack

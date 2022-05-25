@@ -285,10 +285,13 @@ impl<'a> State<'a> {
             len += 1;
         }
 
+        let mut hash_pos = None;
         if let Some(radix_input) = &self.radix_input {
             s.push_str(radix_input);
             s.push('#');
-            len += radix_input.len() + 1;
+            len += radix_input.len();
+            hash_pos = Some(len);
+            len += 1;
         }
 
         let input = self.input.to_string();
@@ -308,7 +311,12 @@ impl<'a> State<'a> {
                 let garbage = s.len().saturating_sub(len);
                 let half_width = width / 2;
                 let left = pos.saturating_sub(half_width);
+                if let Some(i) = &mut hash_pos {
+                    *i = i.saturating_sub(left);
+                }
+
                 let right = (left + garbage + width - 1).clamp(0, s.len());
+
                 s = s[left..right].to_string();
             } else {
                 s.replace_range(0..len.saturating_sub(width - 1), "");
@@ -317,7 +325,15 @@ impl<'a> State<'a> {
 
         print!("{}", s);
 
-        if self.select_idx.is_some() && self.mode != Mode::Pipe {
+        if self.mode == Mode::Radix {
+            if let Some(i) = hash_pos {
+                self.stdout
+                    .queue(cursor::MoveToColumn(i as u16 + 1))
+                    .context("couldn't move cursor")?;
+            }
+        }
+
+        if self.select_idx.is_some() && self.mode != Mode::Pipe && self.mode != Mode::Radix {
             self.stdout
                 .queue(cursor::Hide)
                 .context("couldn't hide cursor")?;
@@ -381,7 +397,7 @@ impl<'a> State<'a> {
         if let Some(int) = radix.parse_bigint(&self.input) {
             let num = Expr::Num(BigRational::from(int));
             expr = num;
-        } else  {
+        } else {
             self.err = Some(SoftError::BadInput);
             return false;
         }
@@ -487,7 +503,8 @@ impl<'a> State<'a> {
                 }
             } else {
                 let x = self.stack.remove(idx);
-                self.stack.insert(idx, StackItem::new(x.approx, f(x.expr), x.radix));
+                self.stack
+                    .insert(idx, StackItem::new(x.approx, f(x.expr), x.radix));
             }
         }
     }

@@ -222,6 +222,7 @@ impl<'a> State<'a> {
                     }
                 } else if self.radix_input.as_ref().map(|s| s.is_empty()).unwrap_or_default() {
                     self.radix_input = None;
+                    self.input_radix = None;
                     self.mode = Mode::Normal;
                 } else {
                     self.err = Some(SoftError::BadRadix);
