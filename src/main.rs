@@ -283,6 +283,9 @@ impl<'a> State<'a> {
         if self.mode == Mode::Pipe {
             s.push('|');
             len += 1;
+        } else if self.mode == Mode::Cmd {
+            s.push(':');
+            len += 1;
         }
 
         let mut hash_pos = None;
@@ -381,11 +384,7 @@ impl<'a> State<'a> {
 
                 self.input_radix = None;
                 self.radix_input = None;
-                if self.config.radix > radix::DECIMAL {
-                    self.mode = Mode::Insert;
-                } else {
-                    self.mode = Mode::Normal;
-                }
+                self.reset_mode();
 
                 return false;
             }
@@ -418,11 +417,7 @@ impl<'a> State<'a> {
         self.eex_input = None;
         self.radix_input = None;
         self.input_radix = None;
-        if self.config.radix > radix::DECIMAL {
-            self.mode = Mode::Insert;
-        } else {
-            self.mode = Mode::Normal;
-        }
+        self.reset_mode();
 
         true
     }

@@ -175,6 +175,12 @@ impl<'a> State<'a> {
                     self.mode = Mode::Pipe;
                 }
             }
+            KeyCode::Char(':') => {
+                self.push_input();
+                self.err = None;
+                self.input.clear();
+                self.mode = Mode::Cmd;
+            }
             KeyCode::Char('i') => self.mode = Mode::Insert,
             KeyCode::Char('e') => self.eex_input = Some(String::new()),
             KeyCode::Char('#') => {

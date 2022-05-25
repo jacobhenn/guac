@@ -18,6 +18,15 @@ impl<'a> State<'a> {
                     self.err = Some(SoftError::GuacCmdMissingArg);
                 }
             }
+            Some(p) if &p == "radix" => {
+                if let Some(arg) = words.next() {
+                    if let Ok(radix) = arg.parse() {
+                        self.config.radix = radix;
+                    } else {
+                        self.err = Some(SoftError::BadSetVal(arg));
+                    }
+                }
+            }
             Some(p) => {
                 self.err = Some(SoftError::BadSetPath(p));
             }

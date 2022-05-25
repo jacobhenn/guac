@@ -18,6 +18,8 @@ mod normal;
 
 mod pipe;
 
+mod cmd;
+
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 /// A message from the current mode to the event loop that tells it what to do.
 pub enum Status {
@@ -63,6 +65,9 @@ pub enum Mode {
 
     /// The mode in which the user can type in a radix in which to input a number.
     Radix,
+
+    /// The mode in which the user can type in a `guac` command, such as `set`.
+    Cmd,
 }
 
 impl Display for Mode {
@@ -75,11 +80,21 @@ impl Display for Mode {
             Self::Variable => write!(f, "enter variable"),
             Self::Pipe => write!(f, "enter command"),
             Self::Radix => write!(f, "enter radix"),
+            Self::Cmd => write!(f, "enter command"),
         }
     }
 }
 
 impl<'a> State<'a> {
+    /// If the current radix is greater than decimal, set the mode to input. Else, set the mode to normal.
+    pub fn reset_mode(&mut self) {
+        if self.input_radix.unwrap_or(self.config.radix) > radix::DECIMAL {
+            self.mode = Mode::Insert
+        } else {
+            self.mode = Mode::Normal
+        }
+    }
+
     /// Handle a key event by matching on the current mode.
     pub fn handle_keypress(&mut self, kev: KeyEvent) -> Status {
         match self.mode {
@@ -90,6 +105,7 @@ impl<'a> State<'a> {
             Mode::Variable => self.variable_mode(kev),
             Mode::Pipe => self.pipe_mode(kev),
             Mode::Radix => self.radix_mode(kev),
+            Mode::Cmd => self.cmd_mode(kev),
         }
     }
 
@@ -215,11 +231,7 @@ impl<'a> State<'a> {
                     .parse::<Radix>()
                 {
                     self.input_radix = Some(radix);
-                    if radix > radix::DECIMAL {
-                        self.mode = Mode::Insert;
-                    } else {
-                        self.mode = Mode::Normal;
-                    }
+                    self.reset_mode();
                 } else if self.radix_input.as_ref().map(|s| s.is_empty()).unwrap_or_default() {
                     self.radix_input = None;
                     self.input_radix = None;
@@ -243,11 +255,7 @@ impl<'a> State<'a> {
             Esc => {
                 self.radix_input = None;
                 self.input_radix = None;
-                if self.config.radix > radix::DECIMAL {
-                    self.mode = Mode::Insert;
-                } else {
-                    self.mode = Mode::Normal;
-                }
+                self.reset_mode();
             }
             _ => (),
         }
