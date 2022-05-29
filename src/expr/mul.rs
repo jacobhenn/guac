@@ -1,5 +1,5 @@
 use super::Expr;
-use num::{traits::Pow, One};
+use num::{traits::Pow, One, Zero};
 use std::ops::{Mul, MulAssign};
 
 impl Expr {
@@ -95,16 +95,6 @@ impl Expr {
         }
     }
 
-    /// Multiply `self` by a single factor, distributing over sums.
-    pub fn distribute_factor(&mut self, rhs: Self) {
-        let rhs_terms = rhs.into_terms();
-        for self_term in self.terms_mut() {
-            for rhs_term in rhs_terms.clone() {
-                self_term.mul_factor_nondistributing(rhs_term);
-            }
-        }
-    }
-
     /// Multiply `self` by a single factor, but do not distribute over sums.
     pub fn mul_factor_nondistributing(&mut self, rhs: Self) {
         if let Some(factor) = self
@@ -117,45 +107,48 @@ impl Expr {
             self.push_factor(rhs);
         }
     }
-
-    // /// Multiply `self` by a single factor. If either is a sum, try both `mul_sf_distributing` and `mul_sf_nondistributing` and choose whichever result has the least `complexity`.
-    // pub fn mul_sf_bifurcating(&mut self, rhs: Self) {
-    //     if matches!(self, Self::Sum(..)) || matches!(rhs, Self::Sum(..)) {
-    //         let mut d = self.clone();
-    //         let mut nd = self.clone();
-    //         d.mul_sf_distributing(rhs.clone());
-    //         nd.mul_sf_nondistributing(rhs);
-    //         d.correct();
-    //         nd.correct();
-    //         if d.complexity() < nd.complexity() {
-    //             *self = d;
-    //         } else {
-    //             *self = nd;
-    //         }
-    //     } else {
-    //         self.mul_sf_nondistributing(rhs);
-    //     }
-    // }
 }
 
 impl Mul for Expr {
     type Output = Self;
 
-    fn mul(mut self, rhs: Self) -> Self::Output {
-        self *= rhs;
-        self
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut res = Self::one();
+
+        // the combined factors of `self` and `rhs` that `res` will be procedurally multiplied by
+        let mut factors = self.into_factors();
+        factors.append(&mut rhs.into_factors());
+
+        // first, multiply everything that doesn't need distribution.
+        // this cursed for loop is necessary because i'm mutating `factors` as i iterate through it
+        let mut i = 0;
+        while i < factors.len() {
+            if !matches!(factors[i], Expr::Sum(_)) { // read: is `factors[i]` a sum?
+                let val = factors.remove(i);
+                res.mul_factor_nondistributing(val);
+            } else {
+                i += 1;
+            }
+        }
+
+        // `factors` now only contains sums, time to distribute
+        for factor in factors {
+            if let Expr::Sum(terms) = factor {
+                let mut new_res = Self::zero();
+                for term in terms {
+                    new_res += res.clone() * term;
+                }
+                res = new_res;
+            }
+        }
+
+        res.correct();
+        res
     }
 }
 
 impl MulAssign for Expr {
     fn mul_assign(&mut self, rhs: Self) {
-        for factor in rhs.into_factors() {
-            self.distribute_factor(factor);
-        }
-
-        self.correct();
-        if let Self::Product(ts) = self {
-            ts.sort_unstable_by_key(Self::product_priority);
-        }
+        *self = self.clone() * rhs;
     }
 }
