@@ -209,7 +209,7 @@ pub struct State<'a> {
 }
 
 impl<'a> State<'a> {
-    fn new(stdout: StdoutLock<'a>, config: Config) -> Self {
+    const fn new(stdout: StdoutLock<'a>, config: Config) -> Self {
         Self {
             stack: Vec::new(),
             history: Vec::new(),
@@ -228,11 +228,8 @@ impl<'a> State<'a> {
 
     /// Return the index of the selected item, or the last item if none are selected.
     fn selected_or_last_idx(&self) -> Option<usize> {
-        if let Some(i) = self.select_idx {
-            Some(i)
-        } else {
-            self.stack.len().checked_sub(1)
-        }
+        self.select_idx
+            .map_or_else(|| self.stack.len().checked_sub(1), Some)
     }
 
     fn display_stack_item(&self, stack_item: &StackItem) -> String {
@@ -244,7 +241,7 @@ impl<'a> State<'a> {
         }
 
         match &stack_item.expr {
-            Expr::Num(n) => s.push_str(&radix.display_bigrational(&n)),
+            Expr::Num(n) => s.push_str(&radix.display_bigrational(n)),
             expr => s.push_str(&expr.to_string()),
         }
         s
@@ -258,9 +255,13 @@ impl<'a> State<'a> {
             .queue(cursor::MoveTo(0, cy))
             .context("couldn't move the cursor to the start of the line")?;
 
+        // the string which will be printed to the terminal, including formatting codes
         let mut s = String::new();
+        // the apparent length of `s`, excluding formatting codes
         let mut len: usize = 0;
+        // the midpoint of the selected expression, not as an index of `s`, but as an `x` coordinate of a terminal cell; `None` if no expression is selected
         let mut selected_pos = None;
+
         for i in 0..self.stack.len() {
             let stack_item = &self.stack[i];
 
@@ -270,6 +271,7 @@ impl<'a> State<'a> {
                 self.display_stack_item(stack_item)
             };
 
+            // if the current expression we're looking at is selected, assign to `selected_pos`
             if Some(i) == self.select_idx {
                 selected_pos = Some(len + expr_str.len() / 2);
                 s.push_str(&format!("{} ", expr_str.underline()));
@@ -288,6 +290,7 @@ impl<'a> State<'a> {
             len += 1;
         }
 
+        // the position of the `#` in the input as a terminal column
         let mut hash_pos = None;
         if let Some(radix_input) = &self.radix_input {
             s.push_str(radix_input);
@@ -304,24 +307,29 @@ impl<'a> State<'a> {
         if let Some(eex_input) = &self.eex_input {
             len += eex_input.len() + 1;
             s.push('ᴇ');
-            s.push_str(&eex_input);
+            s.push_str(eex_input);
         }
 
         let width = terminal::size().context("couldn't get terminal size")?.0 as usize;
 
         if len > (width - 1) {
             if let Some(pos) = selected_pos {
+                // we have to crop `s` *around* the selected expr
+                // the total length in chars of all the formatting escape codes in `s`
                 let garbage = s.len().saturating_sub(len);
                 let half_width = width / 2;
+                // the leftmost index of `s` which will actually be displayed on the terminal
                 let left = pos.saturating_sub(half_width);
                 if let Some(i) = &mut hash_pos {
                     *i = i.saturating_sub(left);
                 }
 
+                // ditto for rightmost
                 let right = (left + garbage + width - 1).clamp(0, s.len());
 
                 s = s[left..right].to_string();
             } else {
+                // no selected expr, so we can just crop off the left
                 s.replace_range(0..len.saturating_sub(width - 1), "");
             }
         }
@@ -391,15 +399,13 @@ impl<'a> State<'a> {
         }
 
         let radix = self.input_radix.unwrap_or(self.config.radix);
-        let mut expr;
 
-        if let Some(int) = radix.parse_bigint(&self.input) {
-            let num = Expr::Num(BigRational::from(int));
-            expr = num;
+        let mut expr = if let Some(int) = radix.parse_bigint(&self.input) {
+            Expr::Num(BigRational::from(int))
         } else {
             self.err = Some(SoftError::BadInput);
             return false;
-        }
+        };
 
         if let Some(eex_input) = &self.eex_input {
             if let Some(int) = radix.parse_bigint(eex_input) {

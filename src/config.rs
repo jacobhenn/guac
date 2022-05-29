@@ -57,16 +57,16 @@ pub enum AngleMeasure {
 impl Display for AngleMeasure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            AngleMeasure::Radian => write!(f, "rad"),
-            AngleMeasure::Turn => write!(f, "turns"),
-            AngleMeasure::Gradian => write!(f, "grad"),
-            AngleMeasure::Degree => write!(f, "deg"),
-            AngleMeasure::Minute => write!(f, "min"),
-            AngleMeasure::Second => write!(f, "sec"),
-            AngleMeasure::BinaryDegree => write!(f, "bdeg"),
-            AngleMeasure::HourAngle => write!(f, "hour"),
-            AngleMeasure::Point => write!(f, "point"),
-            AngleMeasure::NatoMil => write!(f, "mil"),
+            Self::Radian => write!(f, "rad"),
+            Self::Turn => write!(f, "turns"),
+            Self::Gradian => write!(f, "grad"),
+            Self::Degree => write!(f, "deg"),
+            Self::Minute => write!(f, "min"),
+            Self::Second => write!(f, "sec"),
+            Self::BinaryDegree => write!(f, "bdeg"),
+            Self::HourAngle => write!(f, "hour"),
+            Self::Point => write!(f, "point"),
+            Self::NatoMil => write!(f, "mil"),
         }
     }
 }
@@ -76,16 +76,16 @@ impl FromStr for AngleMeasure {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "rad" => Ok(AngleMeasure::Radian),
-            "turns" => Ok(AngleMeasure::Turn),
-            "grad" => Ok(AngleMeasure::Gradian),
-            "deg" => Ok(AngleMeasure::Degree),
-            "min" => Ok(AngleMeasure::Minute),
-            "sec" => Ok(AngleMeasure::Second),
-            "bdeg" => Ok(AngleMeasure::BinaryDegree),
-            "hour" => Ok(AngleMeasure::HourAngle),
-            "point" => Ok(AngleMeasure::Point),
-            "mil" => Ok(AngleMeasure::NatoMil),
+            "rad" => Ok(Self::Radian),
+            "turns" => Ok(Self::Turn),
+            "grad" => Ok(Self::Gradian),
+            "deg" => Ok(Self::Degree),
+            "min" => Ok(Self::Minute),
+            "sec" => Ok(Self::Second),
+            "bdeg" => Ok(Self::BinaryDegree),
+            "hour" => Ok(Self::HourAngle),
+            "point" => Ok(Self::Point),
+            "mil" => Ok(Self::NatoMil),
             _ => Err(()),
         }
     }

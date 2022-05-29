@@ -54,15 +54,15 @@ impl Radix {
     /// Create a valid Radix from an integer.
     pub fn from_int<I>(n: I) -> Option<Self> where I: Into<usize> {
         let n = n.into();
-        if n < 2 || n > 64 {
-            None
-        } else {
+        if (2..=64).contains(&n) {
             Some(Self(n))
+        } else {
+            None
         }
     }
 
     /// Get this radix's Misalian abbreviation from `ABBVS`.
-    pub fn abbv(&self) -> &'static str {
+    pub const fn abbv(&self) -> &'static str {
         ABBVS[self.0 - 2]
     }
 
@@ -83,7 +83,7 @@ impl Radix {
 
     /// Is `digit` one of the digits which can constitute a valid number in this radix?
     pub fn contains_digit(&self, digit: &char) -> bool {
-        DIGITS[0..self.0].iter().position(|c| c == digit).is_some()
+        DIGITS[0..self.0].iter().any(|c| c == digit)
     }
 
     /// Parse a string into a `BigInt` under this radix.
@@ -133,7 +133,7 @@ impl Radix {
 
 impl From<Radix> for Expr {
     fn from(r: Radix) -> Self {
-        Expr::from_int(r.0 as i128)
+        Self::from_int(r.0 as i128)
     }
 }
 

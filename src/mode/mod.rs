@@ -78,9 +78,8 @@ impl Display for Mode {
             Self::Constant => write!(f, "enter constant"),
             Self::MassConstant => write!(f, "enter mass constant"),
             Self::Variable => write!(f, "enter variable"),
-            Self::Pipe => write!(f, "enter command"),
             Self::Radix => write!(f, "enter radix"),
-            Self::Cmd => write!(f, "enter command"),
+            Self::Pipe | Self::Cmd => write!(f, "enter command"),
         }
     }
 }
@@ -89,9 +88,9 @@ impl<'a> State<'a> {
     /// If the current radix is greater than decimal, set the mode to input. Else, set the mode to normal.
     pub fn reset_mode(&mut self) {
         if self.input_radix.unwrap_or(self.config.radix) > radix::DECIMAL {
-            self.mode = Mode::Insert
+            self.mode = Mode::Insert;
         } else {
-            self.mode = Mode::Normal
+            self.mode = Mode::Normal;
         }
     }
 
@@ -140,7 +139,7 @@ impl<'a> State<'a> {
                 .red(),
             "(q: quit)",
             self.config.angle_measure,
-            self.config.radix.to_string(),
+            self.config.radix,
             self.mode.to_string().yellow().bold(),
         );
 
@@ -223,7 +222,7 @@ impl<'a> State<'a> {
     /// Radix mode: allows the user to type in a radix in which to input a number
     pub fn radix_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
-            Enter | Char(' ') | Char('#') => {
+            Enter | Char(' ' | '#') => {
                 if let Ok(radix) = self
                     .radix_input
                     .clone()
@@ -232,7 +231,12 @@ impl<'a> State<'a> {
                 {
                     self.input_radix = Some(radix);
                     self.reset_mode();
-                } else if self.radix_input.as_ref().map(|s| s.is_empty()).unwrap_or_default() {
+                } else if self
+                    .radix_input
+                    .as_ref()
+                    .map(String::is_empty)
+                    .unwrap_or_default()
+                {
                     self.radix_input = None;
                     self.input_radix = None;
                     self.mode = Mode::Normal;
