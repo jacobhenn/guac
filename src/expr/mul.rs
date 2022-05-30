@@ -123,7 +123,8 @@ impl Mul for Expr {
         // this cursed for loop is necessary because i'm mutating `factors` as i iterate through it
         let mut i = 0;
         while i < factors.len() {
-            if !matches!(factors[i], Expr::Sum(_)) { // read: is `factors[i]` a sum?
+            if !matches!(factors[i], Expr::Sum(_)) {
+                // read: is `factors[i]` a sum?
                 let val = factors.remove(i);
                 res.mul_factor_nondistributing(val);
             } else {

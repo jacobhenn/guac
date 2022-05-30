@@ -1,11 +1,11 @@
-use std::{
-    fmt::{self, Display, Formatter},
-    ops::Neg,
+use std::ops::Neg;
+
+use num::{traits::Inv, BigRational, One, Signed, ToPrimitive};
+
+use crate::{
+    config::Config,
+    radix::{self, Radix},
 };
-
-use num::{traits::Inv, One, Signed};
-
-use crate::{RADIX_POW_SIX, RADIX_POW_FOUR_INV};
 
 use super::Expr;
 
@@ -29,19 +29,6 @@ use super::Expr;
 // }
 
 impl Expr {
-    /// Display an expression's float equivalent.
-    pub fn display_approx(self) -> String {
-        if let Ok(n) = f64::try_from(self.clone()) {
-            if n >= f64::from(RADIX_POW_SIX) || n <= RADIX_POW_FOUR_INV {
-                format!("{n:.3e}").replace('e', "ᴇ")
-            } else {
-                format!("{n:.3}")
-            }
-        } else {
-            self.to_string()
-        }
-    }
-
     /// Represents its desired position in a product; i.e., coefficients have a higher priority than variables.
     pub const fn product_priority(&self) -> u8 {
         match self {
@@ -72,21 +59,33 @@ impl Expr {
     }
 
     /// Use the grouping priority of `self` and `child` to decide wether or not to surround `child` in parens, then format it.
-    pub fn format_child(&self, child: &Self) -> String {
+    pub fn display_child(
+        &self,
+        child: &Self,
+        exact: bool,
+        radix: Radix,
+        config: &Config,
+    ) -> String {
         if child.grouping_priority() > self.grouping_priority() || child.is_mod() {
-            format!("({child})")
+            format!("({})", child.display(exact, radix, config))
         } else {
-            format!("{child}")
+            format!("{}", child.display(exact, radix, config))
         }
     }
 
     /// Format this expression, but don't try to split products into a numerator and denominator.
-    pub fn product_safe_format(&self, child: &Self) -> String {
+    pub fn product_safe_format(
+        &self,
+        child: &Self,
+        exact: bool,
+        radix: Radix,
+        config: &Config,
+    ) -> String {
         match child {
             Self::Product(v) => {
                 let str = v
                     .iter()
-                    .map(|t| self.format_child(t))
+                    .map(|t| self.display_child(t, exact, radix, config))
                     .collect::<Vec<_>>()
                     .join("·");
 
@@ -96,7 +95,7 @@ impl Expr {
                     str
                 }
             }
-            other => self.format_child(other),
+            other => self.display_child(other, exact, radix, config),
         }
     }
 
@@ -107,70 +106,152 @@ impl Expr {
             other => other.exponent().map_or(true, Signed::is_positive),
         }
     }
-}
 
-impl Display for Expr {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    /// Render the sum `self`, with terms `ts`.
+    pub fn display_sum(
+        &self,
+        ts: &Vec<Self>,
+        exact: bool,
+        radix: Radix,
+        config: &Config,
+    ) -> String {
+        let mut s = String::new();
+
+        let (pos, neg): (Vec<&Self>, Vec<&Self>) = ts.iter().partition(|t| t.is_positive());
+
+        s.push_str(&format!(
+            "{}",
+            pos.iter()
+                .map(|t| self.display_child(t, exact, radix, config))
+                .collect::<Vec<_>>()
+                .join("+")
+        ));
+
+        for n in neg {
+            s.push_str(&format!(
+                "-{}",
+                self.display_child(&n.clone().neg(), exact, radix, config)
+            ));
+        }
+
+        s
+    }
+
+    /// Render the product `self`, with factors `fs`.
+    pub fn display_product(
+        &self,
+        fs: &Vec<Self>,
+        exact: bool,
+        radix: Radix,
+        config: &Config,
+    ) -> String {
+        let (numer_vec, denom_vec): (Vec<&Self>, Vec<&Self>) =
+            fs.iter().partition(|f| f.has_pos_exp());
+
+        let mut numer = Self::Product(numer_vec.into_iter().map(Clone::clone).collect());
+        let mut denom = Self::Product(denom_vec.into_iter().map(|f| f.clone().inv()).collect());
+        numer.correct();
+        denom.correct();
+
+        format!(
+            "{}{}",
+            self.product_safe_format(&numer, exact, radix, config),
+            if denom.is_one() {
+                String::new()
+            } else {
+                format!(
+                    "/{}",
+                    self.product_safe_format(&denom, exact, radix, config)
+                )
+            }
+        )
+    }
+
+    /// Render the power expression `self`, with base `b` and exponent `e`.
+    pub fn display_power(
+        &self,
+        b: &Box<Self>,
+        e: &Box<Self>,
+        exact: bool,
+        radix: Radix,
+        config: &Config,
+    ) -> String {
+        if **e == Self::from((1, 2)) {
+            format!("sqrt({})", b.display(exact, radix, config))
+        } else if **e == Self::from((1, 3)) {
+            format!("cbrt({})", b.display(exact, radix, config))
+        } else if **e == Self::from((1, 2)).neg() {
+            format!("1/sqrt({})", b.display(exact, radix, config))
+        } else if **e == Self::from((1, 3)).neg() {
+            format!("1/cbrt({})", b.display(exact, radix, config))
+        } else {
+            format!(
+                "{}^{}",
+                self.display_child(b, exact, radix, config),
+                self.display_child(e, exact, radix, config)
+            )
+        }
+    }
+
+    /// Render the rational expression `self`, with rational `b`.
+    pub fn display_num(
+        &self,
+        n: &BigRational,
+        exact: bool,
+        radix: Radix,
+        config: &Config,
+    ) -> String {
+        let r = if exact {
+            if radix == config.radix {
+                String::new()
+            } else {
+                format!("{radix}#")
+            }
+        } else {
+            if config.radix == radix::DECIMAL {
+                String::new()
+            } else {
+                "dec#".to_string()
+            }
+        };
+
+        if exact {
+            format!("{r}{}", radix.display_bigrational(n))
+        } else {
+            let n = n.to_f64().unwrap();
+            if n >= radix.pow(6) as f64 || n <= (*radix as f64).powf(-4.) {
+                format!("{r}{n:.3e}").replace('e', "ᴇ")
+            } else {
+                format!("{r}{n:.3}")
+            }
+        }
+    }
+
+    /// Render `self` to a string with the given preferences.
+    pub fn display(&self, exact: bool, radix: Radix, config: &Config) -> String {
         match self {
-            Self::Num(n) => write!(f, "{n}"),
-            Self::Sum(ts) => {
-                let (pos, neg): (Vec<&Self>, Vec<&Self>) = ts.iter().partition(|t| t.is_positive());
-
-                write!(
-                    f,
-                    "{}",
-                    pos.iter()
-                        .map(|t| self.format_child(t))
-                        .collect::<Vec<_>>()
-                        .join("+")
-                )?;
-
-                for n in neg {
-                    write!(f, "-{}", self.format_child(&n.clone().neg()))?;
-                }
-
-                Ok(())
-            }
-            Self::Product(fs) => {
-                let (numer_vec, denom_vec): (Vec<&Self>, Vec<&Self>) =
-                    fs.iter().partition(|f| f.has_pos_exp());
-
-                let mut numer = Self::Product(numer_vec.into_iter().map(Clone::clone).collect());
-                let mut denom =
-                    Self::Product(denom_vec.into_iter().map(|f| f.clone().inv()).collect());
-                numer.correct();
-                denom.correct();
-
-                write!(f, "{}", self.product_safe_format(&numer))?;
-                if !denom.is_one() {
-                    write!(f, "/{}", self.product_safe_format(&denom))?;
-                }
-
-                Ok(())
-            }
-            Self::Power(b, e) => {
-                if **e == Self::from((1, 2)) {
-                    write!(f, "sqrt({b})")
-                } else if **e == Self::from((1, 3)) {
-                    write!(f, "cbrt({b})")
-                } else if **e == Self::from((1, 2)).neg() {
-                    write!(f, "1/sqrt({b})")
-                } else if **e == Self::from((1, 3)).neg() {
-                    write!(f, "1/cbrt({b})")
-                } else {
-                    write!(f, "{}^{}", self.format_child(b), self.format_child(e))
-                }
-            }
-            Self::Var(s) => write!(f, "{s}"),
-            Self::Const(c) => write!(f, "{c}"),
-            Self::Mod(x, y) => write!(f, "{} mod {}", self.format_child(x), self.format_child(y)),
-            Self::Log(b, a) => write!(f, "log({b})({a})"),
-            Self::Sin(t, m) => write!(f, "sin({t} {m})"),
-            Self::Cos(t, m) => write!(f, "cos({t} {m})"),
-            Self::Tan(t, m) => write!(f, "tan({t} {m})"),
-            Self::Asin(t, m) => write!(f, "(arcsin({t}) {m})"),
-            Self::Acos(t, m) => write!(f, "(arccos({t}) {m})"),
-            Self::Atan(t, m) => write!(f, "(arctan({t}) {m})"),
+            Self::Num(n) => self.display_num(n, exact, radix, config),
+            Self::Sum(ts) => self.display_sum(ts, exact, radix, config),
+            Self::Product(fs) => self.display_product(fs, exact, radix, config),
+            Self::Power(b, e) => self.display_power(b, e, exact, radix, config),
+            Self::Var(s) => format!("{s}"),
+            Self::Const(c) => format!("{c}"),
+            Self::Mod(x, y) => format!(
+                "{} mod {}",
+                self.display_child(x, exact, radix, config),
+                self.display_child(y, exact, radix, config)
+            ),
+            Self::Log(b, a) => format!(
+                "log({})({})",
+                b.display(exact, radix, config),
+                a.display(exact, radix, config)
+            ),
+            Self::Sin(t, m) => format!("sin({} {m})", t.display(exact, radix, config)),
+            Self::Cos(t, m) => format!("cos({} {m})", t.display(exact, radix, config)),
+            Self::Tan(t, m) => format!("tan({} {m})", t.display(exact, radix, config)),
+            Self::Asin(t, m) => format!("(arcsin({}) {m})", t.display(exact, radix, config)),
+            Self::Acos(t, m) => format!("(arccos({}) {m})", t.display(exact, radix, config)),
+            Self::Atan(t, m) => format!("(arctan({}) {m})", t.display(exact, radix, config)),
         }
     }
 }

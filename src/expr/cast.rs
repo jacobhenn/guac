@@ -1,10 +1,7 @@
 use super::{constant::Const, AngleMeasure::Radian, Expr};
-use anyhow::{Context, Error};
+
 use num::{BigInt, BigRational, ToPrimitive};
-use std::{
-    convert::{TryFrom, TryInto},
-    str::FromStr,
-};
+use std::convert::{TryFrom, TryInto};
 
 impl Expr {
     /// If something can be an integer, it can be an Expr.
@@ -78,19 +75,5 @@ pub fn parse_decimal_rational(s: &str) -> Option<BigRational> {
         )
     } else {
         None
-    }
-}
-
-impl FromStr for Expr {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(n) = s.parse::<BigRational>() {
-            Ok(Self::Num(n))
-        } else {
-            Ok(Self::Num(
-                parse_decimal_rational(s).context("couldn't parse from float")?,
-            ))
-        }
     }
 }

@@ -1,4 +1,4 @@
-use crossterm::event::{KeyEvent, KeyCode};
+use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::State;
 

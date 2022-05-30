@@ -54,10 +54,6 @@ use std::{
     process::exit,
 };
 
-const RADIX_POW_SIX: u32 = 1_000_000;
-
-const RADIX_POW_FOUR_INV: f64 = 0.001;
-
 /// A representation of an error on the user's end.
 pub enum SoftError {
     /// Operation would divided by zero.
@@ -152,13 +148,13 @@ pub struct StackItem {
 
 impl StackItem {
     /// Create a new `StackItem` and cache its rendered strings.
-    pub fn new(approx: bool, expr: Expr, radix: Radix) -> Self {
+    pub fn new(approx: bool, expr: Expr, radix: Radix, config: &Config) -> Self {
         Self {
             expr: expr.clone(),
             radix,
             approx,
-            exact_str: expr.clone().to_string(),
-            approx_str: expr.display_approx(),
+            exact_str: expr.clone().display(true, radix, config),
+            approx_str: "TODO".to_string(),
         }
     }
 }
@@ -233,18 +229,9 @@ impl<'a> State<'a> {
     }
 
     fn display_stack_item(&self, stack_item: &StackItem) -> String {
-        let mut s = String::new();
-        let radix = stack_item.radix;
-        if radix != self.config.radix {
-            s.push_str(stack_item.radix.abbv());
-            s.push('#');
-        }
-
-        match &stack_item.expr {
-            Expr::Num(n) => s.push_str(&radix.display_bigrational(n)),
-            expr => s.push_str(&expr.to_string()),
-        }
-        s
+        stack_item
+            .expr
+            .display(!stack_item.approx, stack_item.radix, &self.config)
     }
 
     fn render(&mut self) -> Result<(), Error> {
@@ -362,8 +349,18 @@ impl<'a> State<'a> {
     fn push_expr(&mut self, expr: Expr, radix: Radix) {
         self.stack.insert(
             self.select_idx.unwrap_or(self.stack.len()),
-            StackItem::new(false, expr, radix),
+            StackItem::new(false, expr, radix, &self.config),
         );
+
+        if let Some(i) = &mut self.select_idx {
+            *i += 1;
+        }
+    }
+
+    fn push_stack_item(&mut self, stack_item: StackItem) {
+        self.stack
+            .insert(self.select_idx.unwrap_or(self.stack.len()), stack_item);
+
         if let Some(i) = &mut self.select_idx {
             *i += 1;
         }
@@ -379,6 +376,22 @@ impl<'a> State<'a> {
         } else {
             self.stack.pop();
         }
+    }
+
+    fn parse_expr(&self, s: &str) -> Result<Expr, SoftError> {
+        let radix = self.input_radix.unwrap_or(self.config.radix);
+
+        if let Some(int) = radix.parse_bigint(s) {
+            return Ok(Expr::Num(BigRational::from(int)));
+        } else if radix == self.config.radix {
+            if let Ok(n) = s.parse::<f64>() {
+                if let Some(n) = BigRational::from_float(n) {
+                    return Ok(Expr::Num(n));
+                }
+            }
+        }
+
+        Err(SoftError::BadInput)
     }
 
     fn push_input(&mut self) -> bool {
@@ -398,15 +411,15 @@ impl<'a> State<'a> {
             }
         }
 
-        let radix = self.input_radix.unwrap_or(self.config.radix);
-
-        let mut expr = if let Some(int) = radix.parse_bigint(&self.input) {
-            Expr::Num(BigRational::from(int))
-        } else {
-            self.err = Some(SoftError::BadInput);
-            return false;
+        let mut expr = match self.parse_expr(&self.input) {
+            Ok(e) => e,
+            Err(e) => {
+                self.err = Some(e);
+                return false;
+            }
         };
 
+        let radix = self.input_radix.unwrap_or(self.config.radix);
         if let Some(eex_input) = &self.eex_input {
             if let Some(int) = radix.parse_bigint(eex_input) {
                 let exponent = Expr::Num(BigRational::from(int));
@@ -418,7 +431,9 @@ impl<'a> State<'a> {
             }
         }
 
-        self.push_expr(expr, radix);
+        let stack_item = StackItem::new(self.input.contains('.'), expr, radix, &self.config);
+
+        self.push_stack_item(stack_item);
         self.input = String::new();
         self.eex_input = None;
         self.radix_input = None;
@@ -434,6 +449,7 @@ impl<'a> State<'a> {
                 false,
                 Expr::Var(self.input.clone()),
                 self.input_radix.unwrap_or(self.config.radix),
+                &self.config,
             ));
             self.input.clear();
         }
@@ -464,15 +480,15 @@ impl<'a> State<'a> {
             } else {
                 let x = self.stack.remove(idx - 1);
                 let y = self.stack.remove(idx - 1);
-                let radix = if x.radix == self.config.radix || y.radix == self.config.radix {
-                    self.config.radix
-                } else {
-                    y.radix
-                };
 
                 self.stack.insert(
                     idx - 1,
-                    StackItem::new(x.approx || y.approx, f(x.expr, y.expr), radix),
+                    StackItem::new(
+                        x.approx || y.approx,
+                        f(x.expr, y.expr),
+                        x.radix,
+                        &self.config,
+                    ),
                 );
 
                 if let Some(i) = self.select_idx.as_mut() {
@@ -504,8 +520,10 @@ impl<'a> State<'a> {
                 }
             } else {
                 let x = self.stack.remove(idx);
-                self.stack
-                    .insert(idx, StackItem::new(x.approx, f(x.expr), x.radix));
+                self.stack.insert(
+                    idx,
+                    StackItem::new(x.approx, f(x.expr), x.radix, &self.config),
+                );
             }
         }
     }
@@ -550,7 +568,7 @@ impl<'a> State<'a> {
         while let Some(Ok(line)) = lines.next() {
             idx += 1;
             let line: String = line.chars().filter(|c| !c.is_whitespace()).collect();
-            if let Ok(e) = line.parse::<Expr>() {
+            if let Ok(e) = self.parse_expr(&line) {
                 self.push_expr(e, self.config.radix);
             } else {
                 bad_idxs.push(idx);

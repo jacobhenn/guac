@@ -1,6 +1,6 @@
-- `q`: quit
+- `q` or `escape`: quit
 - digit, `.`, or `e`: type a number in the input (`e` for e-notation)
-- `#` enter radix mode (see wiki)
+- `#` enter radix mode
 - `backspace`
 	- if the input is selected and not empty, drop the last char
 	- if the input is selected but empty, drop the top of the stack
@@ -31,17 +31,18 @@
 - `<`: move selected expression to the left (by analogy to Vim's `<<`)
 - `right`: swap the selected expression (or the topmost one) with the expression to its left
 - `a`: cancel selection and jump to input (by analogy to Vim's `A`)
+- `:`: enter command mode (by analogy to Vim's `:`)
 - `|`: enter pipe mode
-    - `any char`: type a command (to be executed directly, not through your `$SHELL`)
+    - any char: type a command (to be executed directly, not through your `$SHELL`)
     - `enter`: pipe the selected expression (or the topmost one) to the entered command
-    - `esc`: cancel
+    - `escape`: cancel
 - `v`: enter variable mode
-    - `[A-Za-z]`: type in a custom variable name
-    - `esc`: cancel
+    - any char: type in a custom variable name
+    - `escape`: cancel
 - `k`: enter constant mode
     - `p`: pi
     - `e`: e
-    - `g`: euler-mascheroni constant
+    - `g`: euler-mascheroni gamma constant
     - `c`: speed of light (m·s⁻¹)
     - `G`: gravitational constant (m³·kg⁻¹·s⁻²)
     - `h`: planck constant (J·Hz⁻¹)
@@ -51,4 +52,4 @@
     - `m`: mass of
         - `e`: electron (kg)
         - `p`: proton (kg)
-    - `esc`: cancel
+    - `escape`: cancel

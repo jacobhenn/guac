@@ -8,7 +8,7 @@ pub struct Args {
     pub force: bool,
 
     #[argh(subcommand)]
-    pub subc: Option<SubCommand>
+    pub subc: Option<SubCommand>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]

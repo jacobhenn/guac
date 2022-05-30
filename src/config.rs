@@ -1,4 +1,7 @@
-use std::{fmt::{Display, Formatter, self}, str::FromStr};
+use std::{
+    fmt::{self, Display, Formatter},
+    str::FromStr,
+};
 
 use crate::radix::{self, Radix};
 

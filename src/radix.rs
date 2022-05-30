@@ -1,6 +1,6 @@
-use std::{str::FromStr, fmt::Display};
+use std::{fmt::Display, ops::Deref, str::FromStr};
 
-use num::{BigInt, bigint::Sign, BigRational, One, Signed};
+use num::{bigint::Sign, BigInt, BigRational, One, Signed};
 
 use crate::expr::Expr;
 
@@ -52,7 +52,10 @@ pub const OCTOCTAL: Radix = Radix(64);
 
 impl Radix {
     /// Create a valid Radix from an integer.
-    pub fn from_int<I>(n: I) -> Option<Self> where I: Into<usize> {
+    pub fn from_int<I>(n: I) -> Option<Self>
+    where
+        I: Into<usize>,
+    {
         let n = n.into();
         if (2..=64).contains(&n) {
             Some(Self(n))
@@ -72,7 +75,10 @@ impl Radix {
     }
 
     /// Attempt to parse a digit into an integer in this radix.
-    pub fn parse_digit<T>(&self, digit: &char) -> Option<T> where T: TryFrom<usize> {
+    pub fn parse_digit<T>(&self, digit: &char) -> Option<T>
+    where
+        T: TryFrom<usize>,
+    {
         let unchecked_digit: usize = DIGITS.iter().position(|c| c == digit)?;
         if unchecked_digit >= self.0 {
             None
@@ -131,6 +137,14 @@ impl Radix {
     }
 }
 
+impl Deref for Radix {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl From<Radix> for Expr {
     fn from(r: Radix) -> Self {
         Self::from_int(r.0 as i128)
@@ -142,7 +156,13 @@ impl FromStr for Radix {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() == 3 {
-            Ok(Self(ABBVS.iter().position(|c| c == &s).map(|i| i + 2).ok_or(())?))
+            Ok(Self(
+                ABBVS
+                    .iter()
+                    .position(|c| c == &s)
+                    .map(|i| i + 2)
+                    .ok_or(())?,
+            ))
         } else if s.len() == 1 {
             let c = s.chars().next().unwrap();
             Ok(Self(DIGITS.iter().position(|d| d == &c).ok_or(())?))

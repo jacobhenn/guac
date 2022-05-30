@@ -31,14 +31,14 @@ impl<'a> State<'a> {
                 Ok(mut child) => {
                     let mut stdin = child.stdin.take().context("failed to open child stdin")?;
                     let stderr = child.stderr.take().context("failed to open child stderr")?;
-                    let expr = if let Some(i) = self.select_idx {
-                        self.stack[i].expr.clone()
+                    let stack_item = if let Some(i) = self.select_idx {
+                        self.stack[i].clone()
                     } else {
-                        self.stack.last().unwrap().expr.clone()
+                        self.stack.last().unwrap().clone()
                     };
 
                     stdin
-                        .write_all(expr.to_string().as_bytes())
+                        .write_all(self.display_stack_item(&stack_item).as_bytes())
                         .context("failed to write to child stdin")?;
                     mem::drop(stdin);
 
