@@ -17,7 +17,15 @@ x sqrt(π)/5 hex#ef2 78█
 
 ## install
 
-`guac` should work on all of [these](https://github.com/crossterm-rs/crossterm#tested-terminals) terminals, and almost certainly more (basically any modern terminal regardless of OS). if you have the [rust toolchain](https://www.rust-lang.org/tools/install) installed, simply:
+`guac` should work on all of [these](https://github.com/crossterm-rs/crossterm#tested-terminals) terminals, and almost certainly more (basically any modern terminal regardless of OS).
+
+### pre-built
+
+download a pre-built executable of the latest [release](https://github.com/jacobhenn/guac/releases).
+
+### compile yourself
+
+if you have the [rust toolchain](https://www.rust-lang.org/tools/install) installed, simply:
 
 ```
 $ git clone https://github.com/jacobhenn/guac.git
