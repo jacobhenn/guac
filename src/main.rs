@@ -614,6 +614,7 @@ impl<'a> State<'a> {
                         }
                         self.render().context("couldn't render the state")?;
                     }
+                    #[cfg(debug_assertions)]
                     Status::Debug => bail!("debug"),
                 }
             }
