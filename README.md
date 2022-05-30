@@ -4,13 +4,20 @@
 
 ```
 $ guac
-x sqrt(π)/5 78█
-                         (q: quit) rad
+x sqrt(π)/5 hex#ef2 78█
+                            (q: quit) dec rad
 ```
+
+## selling points
+
+- modal [reverse polish notation](https://en.wikipedia.org/wiki/Reverse_Polish_notation), pretty much the most keystroke-efficient calculator interface you can get
+- variables & constants that understand algebra (e.g., `5·π` times `2·π^2` is automatically `10·π^3`)
+- seamless input & display in all radices (bases) from 2 to 64 (see the [wiki](https://github.com/jacobhenn/guac/wiki/radices))
+- horizontal stack that doesn't display on an alternate terminal screen
 
 ## install
 
-`guac` should work on all of [these](https://github.com/crossterm-rs/crossterm#tested-terminals) terminals, and probably more. if you have the [rust toolchain](https://www.rust-lang.org/tools/install) installed, simply:
+`guac` should work on all of [these](https://github.com/crossterm-rs/crossterm#tested-terminals) terminals, and almost certainly more (basically any modern terminal regardless of OS). if you have the [rust toolchain](https://www.rust-lang.org/tools/install) installed, simply:
 
 ```
 $ git clone https://github.com/jacobhenn/guac.git
@@ -24,7 +31,7 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 
 *see this list in the terminal by running* `guac keys`.
 
-- `q`: **q**uit
+- `q` or `escape`: **q**uit
 - digit, `.`, or `e`: type a number in the input (`e` for e-notation)
 - `#` enter radix mode (see the [wiki](https://github.com/jacobhenn/guac/wiki/radices))
 - `backspace`
@@ -57,31 +64,32 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 - `<`: move selected expression to the left (by analogy to Vim's `<<`)
 - `right`: swap the selected expression (or the topmost one) with the expression to its left
 - `a`: cancel selection and jump to input (by analogy to Vim's `A`)
+- `:`: enter command mode (by analogy to Vim's `:`) (see the [wiki](https://github.com/jacobhenn/guac/wiki/commands))
 - `|`: enter **pipe** mode
-    - `any char`: type a command (to be executed directly, **not** through your `$SHELL`)
+    - any char: type a command (to be executed directly, **not** through your `$SHELL`)
     - `enter`: pipe the selected expression (or the topmost one) to the entered command
-    - `esc`: cancel
+    - `escape`: cancel
 - `v`: enter **v**ariable mode
-    - `[A-Za-z]`: type in a custom variable name
-    - `esc`: cancel
+    - any char: type in a custom variable name
+    - `escape`: cancel
 - `k`: enter **c**onstant mode
     - `p`: **p**i
     - `e`: **e**
-    - `g`: euler-mascheroni constant
-    - `c`: speed of light (m·s⁻¹)
+    - `g`: euler-mascheroni **g**amma constant
+    - `c`: **s**peed of light (m·s⁻¹)
     - `G`: **g**ravitational constant (m³·kg⁻¹·s⁻²)
     - `h`: planck constant (J·Hz⁻¹)
     - `H`: reduced planck constant (J·s)
-    - `k`: boltzmann constant (J·K⁻¹)
+    - `k`: boltzmann **c**onstant (J·K⁻¹)
     - `E`: **e**lementary charge (C)
     - `m`: **m**ass of
         - `e`: **e**lectron (kg)
         - `p`: **p**roton (kg)
-    - `esc`: cancel
+    - `escape`: cancel
 
 ## known issues
 
-- `guac` doesn't do *too* well with very narrow (⪅15 column) terminals, or with quickly resizing terminals, although it won't totally break.
+- `guac` doesn't do *too* well with very narrow (<15 column) terminals, or with quickly resizing terminals, although it shouldn't totally break.
 - `guac` does not directly set any limit on number size or precision; this is by design. it will absolutely try to perform any operation you tell it to, and will only panic on account of insufficient resources if the `num` crate or any system call it performs does. if it hangs too long on an operation, just run `pkill guac` from another terminal or close the window.
 - the algorithms `guac` uses to perform algebra are all hand-written, and their correctness should **not** be assumed at this stage of development. if you encounter an inconsistency, please submit an issue.
 - undo/redo is a little janky
