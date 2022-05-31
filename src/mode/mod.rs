@@ -162,19 +162,19 @@ impl<'a> State<'a> {
     /// Constant mode: push a `Const` to the stack.
     pub fn constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
-            Char('p') => self.push_expr(Expr::Const(Const::Pi), self.config.radix),
-            Char('e') => self.push_expr(Expr::Const(Const::E), self.config.radix),
-            Char('c') => self.push_expr(Expr::Const(Const::C), self.config.radix),
-            Char('g') => self.push_expr(Expr::Const(Const::Gamma), self.config.radix),
-            Char('h') => self.push_expr(Expr::Const(Const::H), self.config.radix),
-            Char('k') => self.push_expr(Expr::Const(Const::K), self.config.radix),
+            Char('p') => self.push_expr(&Expr::Const(Const::Pi), self.config.radix),
+            Char('e') => self.push_expr(&Expr::Const(Const::E), self.config.radix),
+            Char('c') => self.push_expr(&Expr::Const(Const::C), self.config.radix),
+            Char('g') => self.push_expr(&Expr::Const(Const::Gamma), self.config.radix),
+            Char('h') => self.push_expr(&Expr::Const(Const::H), self.config.radix),
+            Char('k') => self.push_expr(&Expr::Const(Const::K), self.config.radix),
             Char('m') => {
                 self.mode = Mode::MassConstant;
                 return Status::Render;
             }
-            Char('H') => self.push_expr(Expr::Const(Const::Hbar), self.config.radix),
-            Char('G') => self.push_expr(Expr::Const(Const::G), self.config.radix),
-            Char('E') => self.push_expr(Expr::Const(Const::Qe), self.config.radix),
+            Char('H') => self.push_expr(&Expr::Const(Const::Hbar), self.config.radix),
+            Char('G') => self.push_expr(&Expr::Const(Const::G), self.config.radix),
+            Char('E') => self.push_expr(&Expr::Const(Const::Qe), self.config.radix),
             _ => (),
         }
 
@@ -186,8 +186,8 @@ impl<'a> State<'a> {
     /// Mass constant mode: sub-mode of constant mode for physical constants which represent the mass of certain particles.
     pub fn mass_constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
-            Char('e') => self.push_expr(Expr::Const(Const::Me), self.config.radix),
-            Char('p') => self.push_expr(Expr::Const(Const::Mp), self.config.radix),
+            Char('e') => self.push_expr(&Expr::Const(Const::Me), self.config.radix),
+            Char('p') => self.push_expr(&Expr::Const(Const::Mp), self.config.radix),
             _ => (),
         }
 

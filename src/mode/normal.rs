@@ -169,7 +169,7 @@ impl<'a> State<'a> {
                 self.input = "set angle_measure bdeg".to_string();
                 self.exec_cmd();
             }
-            KeyCode::Char('x') => self.push_expr(Expr::Var("x".to_string()), self.config.radix),
+            KeyCode::Char('x') => self.push_expr(&Expr::Var("x".to_string()), self.config.radix),
             KeyCode::Char('k') => self.mode = Mode::Constant,
             KeyCode::Char('v') => {
                 self.input.clear();

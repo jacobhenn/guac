@@ -148,12 +148,12 @@ pub struct StackItem {
 
 impl StackItem {
     /// Create a new `StackItem` and cache its rendered strings.
-    pub fn new(approx: bool, expr: Expr, radix: Radix, config: &Config) -> Self {
+    pub fn new(approx: bool, expr: &Expr, radix: Radix, config: &Config) -> Self {
         Self {
             expr: expr.clone(),
             radix,
             approx,
-            exact_str: expr.clone().display(true, radix, config),
+            exact_str: expr.display(true, radix, config),
             approx_str: "TODO".to_string(),
         }
     }
@@ -346,7 +346,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    fn push_expr(&mut self, expr: Expr, radix: Radix) {
+    fn push_expr(&mut self, expr: &Expr, radix: Radix) {
         self.stack.insert(
             self.select_idx.unwrap_or(self.stack.len()),
             StackItem::new(false, expr, radix, &self.config),
@@ -438,7 +438,7 @@ impl<'a> State<'a> {
                     .as_ref()
                     .map(|s| s.contains('-'))
                     .unwrap_or_default(),
-            expr,
+            &expr,
             radix,
             &self.config,
         );
@@ -457,7 +457,7 @@ impl<'a> State<'a> {
         if !self.input.is_empty() {
             self.stack.push(StackItem::new(
                 false,
-                Expr::Var(self.input.clone()),
+                &Expr::Var(self.input.clone()),
                 self.input_radix.unwrap_or(self.config.radix),
                 &self.config,
             ));
@@ -495,7 +495,7 @@ impl<'a> State<'a> {
                     idx - 1,
                     StackItem::new(
                         x.approx || y.approx,
-                        f(x.expr, y.expr),
+                        &f(x.expr, y.expr),
                         x.radix,
                         &self.config,
                     ),
@@ -532,7 +532,7 @@ impl<'a> State<'a> {
                 let x = self.stack.remove(idx);
                 self.stack.insert(
                     idx,
-                    StackItem::new(x.approx, f(x.expr), x.radix, &self.config),
+                    StackItem::new(x.approx, &f(x.expr), x.radix, &self.config),
                 );
             }
         }
@@ -579,7 +579,7 @@ impl<'a> State<'a> {
             idx += 1;
             let line: String = line.chars().filter(|c| !c.is_whitespace()).collect();
             if let Ok(e) = self.parse_expr(&line) {
-                self.push_expr(e, self.config.radix);
+                self.push_expr(&e, self.config.radix);
             } else {
                 bad_idxs.push(idx);
             }
@@ -717,8 +717,12 @@ fn go() -> Result<(), Error> {
 
     match args.subc {
         Some(SubCommand::Keys(..)) => print!(include_str!("keys.txt")),
+        Some(SubCommand::Version(..)) => {
+            println!("guac v{}", env!("CARGO_PKG_VERSION"));
+        }
         None => {
             guac_interactive(args.force)?;
+            cleanup();
         }
     }
 
@@ -727,7 +731,6 @@ fn go() -> Result<(), Error> {
 
 fn main() {
     let res = go();
-    cleanup();
     if let Err(e) = res {
         eprintln!("{}{} {e:#}", "guac error".bold().red(), ":".bold());
         exit(1);

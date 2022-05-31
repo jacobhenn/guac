@@ -69,7 +69,7 @@ impl Expr {
         if child.grouping_priority() > self.grouping_priority() || child.is_mod() {
             format!("({})", child.display(exact, radix, config))
         } else {
-            format!("{}", child.display(exact, radix, config))
+            child.display(exact, radix, config)
         }
     }
 
@@ -108,24 +108,17 @@ impl Expr {
     }
 
     /// Render the sum `self`, with terms `ts`.
-    pub fn display_sum(
-        &self,
-        ts: &Vec<Self>,
-        exact: bool,
-        radix: Radix,
-        config: &Config,
-    ) -> String {
+    pub fn display_sum(&self, ts: &[Self], exact: bool, radix: Radix, config: &Config) -> String {
         let mut s = String::new();
 
         let (pos, neg): (Vec<&Self>, Vec<&Self>) = ts.iter().partition(|t| t.is_positive());
 
-        s.push_str(&format!(
-            "{}",
-            pos.iter()
+        s.push_str(
+            &pos.iter()
                 .map(|t| self.display_child(t, exact, radix, config))
                 .collect::<Vec<_>>()
-                .join("+")
-        ));
+                .join("+"),
+        );
 
         for n in neg {
             s.push_str(&format!(
@@ -140,7 +133,7 @@ impl Expr {
     /// Render the product `self`, with factors `fs`.
     pub fn display_product(
         &self,
-        fs: &Vec<Self>,
+        fs: &[Self],
         exact: bool,
         radix: Radix,
         config: &Config,
@@ -170,19 +163,19 @@ impl Expr {
     /// Render the power expression `self`, with base `b` and exponent `e`.
     pub fn display_power(
         &self,
-        b: &Box<Self>,
-        e: &Box<Self>,
+        b: &Self,
+        e: &Self,
         exact: bool,
         radix: Radix,
         config: &Config,
     ) -> String {
-        if **e == Self::from((1, 2)) {
+        if *e == Self::from((1, 2)) {
             format!("sqrt({})", b.display(exact, radix, config))
-        } else if **e == Self::from((1, 3)) {
+        } else if *e == Self::from((1, 3)) {
             format!("cbrt({})", b.display(exact, radix, config))
-        } else if **e == Self::from((1, 2)).neg() {
+        } else if *e == Self::from((1, 2)).neg() {
             format!("1/sqrt({})", b.display(exact, radix, config))
-        } else if **e == Self::from((1, 3)).neg() {
+        } else if *e == Self::from((1, 3)).neg() {
             format!("1/cbrt({})", b.display(exact, radix, config))
         } else {
             format!(
@@ -194,32 +187,29 @@ impl Expr {
     }
 
     /// Render the rational expression `self`, with rational `b`.
-    pub fn display_num(
-        &self,
-        n: &BigRational,
-        exact: bool,
-        radix: Radix,
-        config: &Config,
-    ) -> String {
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `!exact` and `n` cannot be represented as an f64.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn display_num(n: &BigRational, exact: bool, radix: Radix, config: &Config) -> String {
         let r = if exact {
             if radix == config.radix {
                 String::new()
             } else {
                 format!("{radix}#")
             }
+        } else if config.radix == radix::DECIMAL {
+            String::new()
         } else {
-            if config.radix == radix::DECIMAL {
-                String::new()
-            } else {
-                "dec#".to_string()
-            }
+            "dec#".to_string()
         };
 
         if exact {
             format!("{r}{}", radix.display_bigrational(n))
         } else {
             let n = n.to_f64().unwrap();
-            if n >= radix.pow(6) as f64 || n <= (*radix as f64).powf(-4.) {
+            if n >= radix.pow(6) as f64 || n <= (*radix as f64).powi(-4) {
                 format!("{r}{n:.3e}").replace('e', "ᴇ")
             } else {
                 format!("{r}{n:.3}")
@@ -230,11 +220,11 @@ impl Expr {
     /// Render `self` to a string with the given preferences.
     pub fn display(&self, exact: bool, radix: Radix, config: &Config) -> String {
         match self {
-            Self::Num(n) => self.display_num(n, exact, radix, config),
+            Self::Num(n) => Self::display_num(n, exact, radix, config),
             Self::Sum(ts) => self.display_sum(ts, exact, radix, config),
             Self::Product(fs) => self.display_product(fs, exact, radix, config),
             Self::Power(b, e) => self.display_power(b, e, exact, radix, config),
-            Self::Var(s) => format!("{s}"),
+            Self::Var(s) => s.to_string(),
             Self::Const(c) => format!("{c}"),
             Self::Mod(x, y) => format!(
                 "{} mod {}",

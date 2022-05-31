@@ -113,7 +113,7 @@ impl Mul for Expr {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut res = Self::one();
+        let mut out = Self::one();
 
         // the combined factors of `self` and `rhs` that `res` will be procedurally multiplied by
         let mut factors = self.into_factors();
@@ -123,12 +123,12 @@ impl Mul for Expr {
         // this cursed for loop is necessary because i'm mutating `factors` as i iterate through it
         let mut i = 0;
         while i < factors.len() {
-            if !matches!(factors[i], Expr::Sum(_)) {
+            if let Expr::Sum(_) = factors[i] {
+                i += 1;
+            } else {
                 // read: is `factors[i]` a sum?
                 let val = factors.remove(i);
-                res.mul_factor_nondistributing(val);
-            } else {
-                i += 1;
+                out.mul_factor_nondistributing(val);
             }
         }
 
@@ -137,14 +137,14 @@ impl Mul for Expr {
             if let Expr::Sum(terms) = factor {
                 let mut new_res = Self::zero();
                 for term in terms {
-                    new_res += res.clone() * term;
+                    new_res += out.clone() * term;
                 }
-                res = new_res;
+                out = new_res;
             }
         }
 
-        res.correct();
-        res
+        out.correct();
+        out
     }
 }
 

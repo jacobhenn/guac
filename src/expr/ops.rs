@@ -13,15 +13,16 @@ impl Expr {
     /// Take the logarithm of self in base `base`. Perform obvious simplifications.
     #[must_use]
     pub fn log(self, base: Self) -> Self {
-        if let Self::Power(b, e) = self {
-            if base == *b {
-                return *e;
+        match (self, base) {
+            (Self::Power(b, e), base) => {
+                if base == *b {
+                    *e
+                } else {
+                    *b * base.log(*e)
+                }
             }
-
-            return *b * base.log(*e);
+            (other, base) => Self::Log(Box::new(base), Box::new(other)),
         }
-
-        Self::Log(Box::new(base), Box::new(self))
     }
 
     /// Take the square root of this expression.

@@ -15,9 +15,15 @@ pub struct Args {
 #[argh(subcommand)]
 pub enum SubCommand {
     Keys(Keys),
+    Version(Version),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// print a list of keybindings and their actions
 #[argh(subcommand, name = "keys")]
 pub struct Keys {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// print the version of this `guac` executable
+#[argh(subcommand, name = "version")]
+pub struct Version {}
