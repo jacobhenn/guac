@@ -89,7 +89,17 @@ impl<'a> State<'a> {
                 self.select_idx = None;
             }
             KeyCode::Char('+') => self.apply_binary(|x, y| x + y, |_, _| None),
-            KeyCode::Char('-') => self.apply_binary(|x, y| x - y, |_, _| None),
+            KeyCode::Char('-') => {
+                if let Some(s) = &mut self.eex_input {
+                    if s.starts_with('-') {
+                        s.remove(0);
+                    } else {
+                        s.insert(0, '-');
+                    }
+                } else {
+                    self.apply_binary(|x, y| x - y, |_, _| None);
+                }
+            },
             KeyCode::Char('*') => self.apply_binary(|x, y| x * y, |_, _| None),
             KeyCode::Char('/') => self.apply_binary(
                 |x, y| x / y,

@@ -431,7 +431,17 @@ impl<'a> State<'a> {
             }
         }
 
-        let stack_item = StackItem::new(self.input.contains('.'), expr, radix, &self.config);
+        let stack_item = StackItem::new(
+            self.input.contains('.')
+                || self
+                    .eex_input
+                    .as_ref()
+                    .map(|s| s.contains('-'))
+                    .unwrap_or_default(),
+            expr,
+            radix,
+            &self.config,
+        );
 
         self.push_stack_item(stack_item);
         self.input = String::new();

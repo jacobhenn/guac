@@ -1,4 +1,8 @@
-use std::{fmt::Display, ops::Deref, str::FromStr};
+use std::{
+    fmt::Display,
+    ops::{Deref, Neg},
+    str::FromStr,
+};
 
 use num::{bigint::Sign, BigInt, BigRational, One, Signed};
 
@@ -98,8 +102,19 @@ impl Radix {
             return None;
         }
 
-        let buf: Option<Vec<u8>> = s.chars().map(|c| self.parse_digit::<u8>(&c)).collect();
-        BigInt::from_radix_be(Sign::Plus, &buf?, self.0 as u32)
+        let negative = s.starts_with('-');
+        let mut chars = s.chars();
+        if negative {
+            chars.next();
+        }
+
+        let buf: Option<Vec<u8>> = chars.map(|c| self.parse_digit::<u8>(&c)).collect();
+        let res = BigInt::from_radix_be(Sign::Plus, &buf?, self.0 as u32);
+        if negative {
+            res.map(Neg::neg)
+        } else {
+            res
+        }
     }
 
     /// Turn a `BigInt` into a string under this radix.
