@@ -28,7 +28,10 @@ impl Expr {
         F: Fn(f64, f64) -> f64,
         G: Fn(Expr, Expr) -> Expr,
     {
-        if let (Expr::Num(m), Expr::Num(n)) = (x.clone().approx(), y.clone().approx()) {
+        let xa = x.approx();
+        let ya = y.approx();
+
+        if let (Expr::Num(m), Expr::Num(n)) = (xa.clone(), ya.clone()) {
             let (mf, nf) = (frac2f64(m), frac2f64(n));
             let rf = f(mf, nf);
             if let Some(r) = BigRational::from_float(rf) {
@@ -36,7 +39,7 @@ impl Expr {
             }
         }
 
-        g(x, y)
+        g(xa, ya)
     }
 
     fn map_approx_unary<F, G>(x: Expr, f: F, g: G) -> Expr
@@ -44,7 +47,9 @@ impl Expr {
         F: Fn(f64) -> f64,
         G: Fn(Expr) -> Expr,
     {
-        if let Expr::Num(n) = x.clone().approx() {
+        let xa = x.approx();
+
+        if let Expr::Num(n) = xa.clone() {
             let nf = frac2f64(n);
             let rf = f(nf);
             if let Some(r) = BigRational::from_float(rf) {
@@ -52,7 +57,7 @@ impl Expr {
             }
         }
 
-        g(x)
+        g(xa)
     }
 
     /// If something can be an integer, it can be an Expr.
