@@ -22,6 +22,9 @@ impl<'a> State<'a> {
                 if let Some(arg) = words.next() {
                     if let Ok(radix) = arg.parse() {
                         self.config.radix = radix;
+                        for stack_item in &mut self.stack {
+                            stack_item.rerender(&self.config);
+                        }
                     } else {
                         self.err = Some(SoftError::BadSetVal(arg));
                     }

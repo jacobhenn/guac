@@ -3,7 +3,9 @@ use std::{
     str::FromStr,
 };
 
-use crate::radix::{self, Radix};
+use num::One;
+
+use crate::{radix::{self, Radix}, expr::{Expr, constant::Const}};
 
 /// The configuration stored in `State` which will be read from a config file in the future.
 pub struct Config {
@@ -55,6 +57,42 @@ pub enum AngleMeasure {
 
     /// 1/6400 turn.
     NatoMil,
+}
+
+impl AngleMeasure {
+    /// Return how many of this angle measure make up a full turn.
+    pub fn full_turn(self) -> Expr {
+        match self {
+            AngleMeasure::Radian => Expr::from_int(2) * Const::Pi.into(),
+            AngleMeasure::Turn => Expr::one(),
+            AngleMeasure::Gradian => Expr::from_int(400),
+            AngleMeasure::Degree => Expr::from_int(360),
+            AngleMeasure::Minute => Expr::from_int(21600),
+            AngleMeasure::Second => Expr::from_int(1_296_000),
+            AngleMeasure::BinaryDegree => Expr::from_int(256),
+            AngleMeasure::HourAngle => Expr::from_int(24),
+            AngleMeasure::Point => Expr::from_int(32),
+            AngleMeasure::NatoMil => Expr::from_int(6400),
+        }
+    }
+}
+
+impl AngleMeasure {
+    /// Return how many of this angle measure make up a full turn.
+    pub fn full_turn_f64(self) -> f64 {
+        match self {
+            AngleMeasure::Radian => std::f64::consts::TAU,
+            AngleMeasure::Turn => 1.,
+            AngleMeasure::Gradian => 400.,
+            AngleMeasure::Degree => 360.,
+            AngleMeasure::Minute => 21600.,
+            AngleMeasure::Second => 1_296_000.,
+            AngleMeasure::BinaryDegree => 256.,
+            AngleMeasure::HourAngle => 24.,
+            AngleMeasure::Point => 32.,
+            AngleMeasure::NatoMil => 6400.,
+        }
+    }
 }
 
 impl Display for AngleMeasure {

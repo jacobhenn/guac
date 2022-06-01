@@ -154,8 +154,14 @@ impl StackItem {
             radix,
             approx,
             exact_str: expr.display(true, radix, config),
-            approx_str: "TODO".to_string(),
+            approx_str: expr.clone().approx().display(false, radix, config),
         }
+    }
+
+    /// Update the cached strings in a stack item.
+    pub fn rerender(&mut self, config: &Config) {
+        self.exact_str = self.expr.display(true, self.radix, config);
+        self.approx_str = self.expr.clone().approx().display(false, self.radix, config);
     }
 }
 
@@ -228,12 +234,6 @@ impl<'a> State<'a> {
             .map_or_else(|| self.stack.len().checked_sub(1), Some)
     }
 
-    fn display_stack_item(&self, stack_item: &StackItem) -> String {
-        stack_item
-            .expr
-            .display(!stack_item.approx, stack_item.radix, &self.config)
-    }
-
     fn render(&mut self) -> Result<(), Error> {
         let (_, cy) = cursor::position().context("couldn't get cursor pos")?;
         self.stdout
@@ -255,7 +255,7 @@ impl<'a> State<'a> {
             let expr_str = if option_env!("GUAC_DEBUG") == Some("true") {
                 format!("{:?}", stack_item.expr)
             } else {
-                self.display_stack_item(stack_item)
+                stack_item.to_string()
             };
 
             // if the current expression we're looking at is selected, assign to `selected_pos`
@@ -401,6 +401,7 @@ impl<'a> State<'a> {
             } else if let Some(i) = self.selected_or_last_idx() {
                 if let Some(x) = self.stack.get_mut(i) {
                     x.radix = self.input_radix.unwrap_or(self.config.radix);
+                    x.rerender(&self.config);
                 }
 
                 self.input_radix = None;

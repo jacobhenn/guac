@@ -7,25 +7,7 @@ use num::{
 
 use crate::config::AngleMeasure;
 
-use super::{constant::Const, Expr};
-
-impl AngleMeasure {
-    /// Return how many of this angle measure make up a full turn.
-    pub fn full_turn(self) -> Expr {
-        match self {
-            AngleMeasure::Radian => Expr::from_int(2) * Const::Pi.into(),
-            AngleMeasure::Turn => Expr::one(),
-            AngleMeasure::Gradian => Expr::from_int(400),
-            AngleMeasure::Degree => Expr::from_int(360),
-            AngleMeasure::Minute => Expr::from_int(21600),
-            AngleMeasure::Second => Expr::from_int(1_296_000),
-            AngleMeasure::BinaryDegree => Expr::from_int(256),
-            AngleMeasure::HourAngle => Expr::from_int(24),
-            AngleMeasure::Point => Expr::from_int(32),
-            AngleMeasure::NatoMil => Expr::from_int(6400),
-        }
-    }
-}
+use super::Expr;
 
 impl Expr {
     /// Interpret the given expression as an angle in `measure`, and convert it to an angle in turns.

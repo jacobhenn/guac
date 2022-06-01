@@ -1,9 +1,10 @@
 use std::ops::Neg;
 
-use num::{traits::Inv, BigRational, One, Signed, ToPrimitive};
+use num::{traits::Inv, BigRational, One, Signed};
 
 use crate::{
     config::Config,
+    expr::cast,
     radix::{self, Radix},
 };
 
@@ -187,10 +188,6 @@ impl Expr {
     }
 
     /// Render the rational expression `self`, with rational `b`.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `!exact` and `n` cannot be represented as an f64.
     #[allow(clippy::cast_precision_loss)]
     pub fn display_num(n: &BigRational, exact: bool, radix: Radix, config: &Config) -> String {
         let r = if exact {
@@ -208,7 +205,7 @@ impl Expr {
         if exact {
             format!("{r}{}", radix.display_bigrational(n))
         } else {
-            let n = n.to_f64().unwrap();
+            let n = cast::frac2f64(n.clone());
             if n >= radix.pow(6) as f64 || n <= (*radix as f64).powi(-4) {
                 format!("{r}{n:.3e}").replace('e', "ᴇ")
             } else {

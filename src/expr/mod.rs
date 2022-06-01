@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use crate::config::AngleMeasure;
 
 use self::constant::Const;
@@ -170,12 +168,6 @@ impl Expr {
             Self::Num(n) => Some(n),
             _ => None,
         }
-    }
-
-    /// Returns a floating-point approximation of the real number represented by this expression.
-    #[allow(clippy::result_unit_err)]
-    pub fn to_f64(self) -> Result<f64, ()> {
-        self.try_into()
     }
 
     /// Performs obvious and computationally inexpensive simplifications.

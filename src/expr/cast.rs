@@ -1,9 +1,60 @@
-use super::{constant::Const, AngleMeasure::Radian, Expr};
+use crate::config::AngleMeasure;
 
-use num::{BigInt, BigRational, ToPrimitive};
-use std::convert::{TryFrom, TryInto};
+use super::{constant::Const, Expr};
+
+use num::{traits::Pow, BigInt, BigRational, ToPrimitive};
+
+/// Turn a `BigRational` into an `f64`.
+pub fn frac2f64(n: BigRational) -> f64 {
+    let max = BigInt::from(i128::MAX);
+
+    let mut numer = n.numer().clone();
+    let mut denom = n.denom().clone();
+
+    while numer >= max && denom >= max {
+        numer /= 2;
+        denom /= 2;
+    }
+
+    let ni = numer.to_i128().unwrap();
+    let di = denom.to_i128().unwrap();
+
+    ni as f64 / di as f64
+}
 
 impl Expr {
+    fn map_approx_binary<F, G>(x: Expr, y: Expr, f: F, g: G) -> Expr
+    where
+        F: Fn(f64, f64) -> f64,
+        G: Fn(Expr, Expr) -> Expr,
+    {
+        if let (Expr::Num(m), Expr::Num(n)) = (x.clone().approx(), y.clone().approx()) {
+            let (mf, nf) = (frac2f64(m), frac2f64(n));
+            let rf = f(mf, nf);
+            if let Some(r) = BigRational::from_float(rf) {
+                return Expr::Num(r);
+            }
+        }
+
+        g(x, y)
+    }
+
+    fn map_approx_unary<F, G>(x: Expr, f: F, g: G) -> Expr
+    where
+        F: Fn(f64) -> f64,
+        G: Fn(Expr) -> Expr,
+    {
+        if let Expr::Num(n) = x.clone().approx() {
+            let nf = frac2f64(n);
+            let rf = f(nf);
+            if let Some(r) = BigRational::from_float(rf) {
+                return Expr::Num(r);
+            }
+        }
+
+        g(x)
+    }
+
     /// If something can be an integer, it can be an Expr.
     pub fn from_int<I>(i: I) -> Self
     where
@@ -11,37 +62,63 @@ impl Expr {
     {
         Self::Num(BigRational::from(BigInt::from(i.into())))
     }
+
+    /// Reduce `self` by approximating. For example, turns
+    pub fn approx(self) -> Self {
+        match self {
+            n @ Self::Num(_) | n @ Self::Var(_) | n @ Self::Const(_) => n,
+            Self::Sum(ts) => ts.into_iter().map(|t| t.approx()).sum(),
+            Self::Product(fs) => fs.into_iter().map(|f| f.approx()).product(),
+            Self::Power(b, e) => Self::map_approx_binary(*b, *e, |b, e| b.powf(e), |b, e| b.pow(e)),
+            Self::Log(b, a) => Self::map_approx_binary(*b, *a, |b, a| b.log(a), |b, a| b.log(a)),
+            Self::Mod(n, d) => Self::map_approx_binary(*n, *d, |n, d| n % d, |n, d| n % d),
+            Self::Sin(x, m) => Self::map_approx_unary(
+                *x,
+                |x| convert_angle_f64(x, m, AngleMeasure::Radian).sin(),
+                |x| x.generic_sin(m),
+            ),
+            Self::Cos(x, m) => Self::map_approx_unary(
+                *x,
+                |x| convert_angle_f64(x, m, AngleMeasure::Radian).sin(),
+                |x| x.generic_cos(m),
+            ),
+            Self::Tan(x, m) => Self::map_approx_unary(
+                *x,
+                |x| convert_angle_f64(x, m, AngleMeasure::Radian).sin(),
+                |x| x.generic_tan(m),
+            ),
+            Self::Asin(x, m) => Self::map_approx_unary(
+                *x,
+                |x| convert_angle_f64(x.asin(), AngleMeasure::Radian, m),
+                |x| x.asin(m),
+            ),
+            Self::Acos(x, m) => Self::map_approx_unary(
+                *x,
+                |x| convert_angle_f64(x.asin(), AngleMeasure::Radian, m),
+                |x| x.acos(m),
+            ),
+            Self::Atan(x, m) => Self::map_approx_unary(
+                *x,
+                |x| convert_angle_f64(x.asin(), AngleMeasure::Radian, m),
+                |x| x.atan(m),
+            ),
+        }
+    }
+}
+
+/// Take an angle in `from` and convert it to an angle in `to`.
+pub fn convert_angle_f64(x: f64, from: AngleMeasure, to: AngleMeasure) -> f64 {
+    (x / from.full_turn_f64()) * to.full_turn_f64()
 }
 
 impl TryFrom<Expr> for f64 {
     type Error = ();
 
-    #[allow(clippy::use_self)]
     fn try_from(value: Expr) -> Result<Self, Self::Error> {
-        match value {
-            Expr::Num(n) => n.to_f64().ok_or(()),
-            Expr::Sum(ts) => ts.into_iter().map(Expr::to_f64).sum(),
-            Expr::Product(fs) => fs
-                .into_iter()
-                .map(<Expr as TryInto<Self>>::try_into)
-                .product::<Result<Self, _>>(),
-            Expr::Power(b, e) => Ok(b.to_f64()?.powf(e.to_f64()?)),
-            Expr::Log(b, a) => Ok(a.to_f64()?.log(b.to_f64()?)),
-            Expr::Const(c) => Ok(c.into()),
-            Expr::Mod(x, y) => Ok(x.to_f64()? % y.to_f64()?),
-            Expr::Sin(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.sin()),
-            Expr::Cos(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.cos()),
-            Expr::Tan(x, m) => Ok(x.convert_angle(m, Radian).to_f64()?.tan()),
-            Expr::Asin(x, m) => {
-                Ok((x.to_f64()?.asin() / std::f64::consts::TAU) * m.full_turn().to_f64()?)
-            }
-            Expr::Acos(x, m) => {
-                Ok((x.to_f64()?.acos() / std::f64::consts::TAU) * m.full_turn().to_f64()?)
-            }
-            Expr::Atan(x, m) => {
-                Ok((x.to_f64()?.atan() / std::f64::consts::TAU) * m.full_turn().to_f64()?)
-            }
-            Expr::Var(_) => Err(()),
+        if let Expr::Num(n) = value.approx() {
+            Ok(frac2f64(n))
+        } else {
+            Err(())
         }
     }
 }

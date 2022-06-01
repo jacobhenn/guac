@@ -38,7 +38,7 @@ impl<'a> State<'a> {
                     };
 
                     stdin
-                        .write_all(self.display_stack_item(&stack_item).as_bytes())
+                        .write_all(stack_item.to_string().as_bytes())
                         .context("failed to write to child stdin")?;
                     mem::drop(stdin);
 
