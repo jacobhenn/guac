@@ -12,7 +12,7 @@ pub fn frac2f64(n: &BigRational) -> f64 {
     let mut numer = n.numer().clone();
     let mut denom = n.denom().clone();
 
-    while numer > max && denom > max {
+    while numer > max || denom > max {
         numer /= 2;
         denom /= 2;
     }
