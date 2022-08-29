@@ -205,7 +205,7 @@ impl Expr {
         if exact {
             format!("{r}{}", radix.display_bigrational(n))
         } else {
-            let n = cast::frac2f64(n.clone());
+            let n = cast::frac2f64(&n.clone());
             if n >= radix.pow(6) as f64 || n <= (*radix as f64).powi(-4) {
                 format!("{r}{n:.3e}").replace('e', "ᴇ")
             } else {

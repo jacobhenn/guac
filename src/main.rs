@@ -128,8 +128,8 @@ impl Display for SoftError {
             Self::UnknownGuacCmd(s) => write!(f, "E11: unknown cmd {s}"),
             Self::GuacCmdMissingArg => write!(f, "E12: cmd missing arg"),
             Self::GuacCmdExtraArg => write!(f, "E13: too many cmd args"),
-            Self::BadSetPath(p) => write!(f, "E14: no such setting `{p}`",),
-            Self::BadSetVal(v) => write!(f, "E15: couldnt parse `{v}`",),
+            Self::BadSetPath(p) => write!(f, "E14: no such setting \"{p}\"",),
+            Self::BadSetVal(v) => write!(f, "E15: couldnt parse \"{v}\"",),
             #[cfg(debug_assertions)]
             Self::Debug(s) => write!(f, "DEBUG: {s}"),
         }
@@ -161,7 +161,11 @@ impl StackItem {
     /// Update the cached strings in a stack item.
     pub fn rerender(&mut self, config: &Config) {
         self.exact_str = self.expr.display(true, self.radix, config);
-        self.approx_str = self.expr.clone().approx().display(false, self.radix, config);
+        self.approx_str = self
+            .expr
+            .clone()
+            .approx()
+            .display(false, self.radix, config);
     }
 }
 

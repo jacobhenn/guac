@@ -5,17 +5,19 @@ use super::{constant::Const, Expr};
 use num::{traits::Pow, BigInt, BigRational, ToPrimitive};
 
 /// Turn a `BigRational` into an `f64`.
-pub fn frac2f64(n: BigRational) -> f64 {
+#[allow(clippy::missing_panics_doc)]
+pub fn frac2f64(n: &BigRational) -> f64 {
     let max = BigInt::from(i128::MAX);
 
     let mut numer = n.numer().clone();
     let mut denom = n.denom().clone();
 
-    while numer >= max && denom >= max {
+    while numer > max && denom > max {
         numer /= 2;
         denom /= 2;
     }
 
+    // these assertions cannot panic, because we made sure that `numer` and denom are `<= i128::MAX`.
     let ni = numer.to_i128().unwrap();
     let di = denom.to_i128().unwrap();
 
@@ -23,37 +25,37 @@ pub fn frac2f64(n: BigRational) -> f64 {
 }
 
 impl Expr {
-    fn map_approx_binary<F, G>(x: Expr, y: Expr, f: F, g: G) -> Expr
+    fn map_approx_binary<F, G>(x: Self, y: Self, f: F, g: G) -> Self
     where
         F: Fn(f64, f64) -> f64,
-        G: Fn(Expr, Expr) -> Expr,
+        G: Fn(Self, Self) -> Self,
     {
         let xa = x.approx();
         let ya = y.approx();
 
-        if let (Expr::Num(m), Expr::Num(n)) = (xa.clone(), ya.clone()) {
-            let (mf, nf) = (frac2f64(m), frac2f64(n));
+        if let (Self::Num(m), Self::Num(n)) = (xa.clone(), ya.clone()) {
+            let (mf, nf) = (frac2f64(&m), frac2f64(&n));
             let rf = f(mf, nf);
             if let Some(r) = BigRational::from_float(rf) {
-                return Expr::Num(r);
+                return Self::Num(r);
             }
         }
 
         g(xa, ya)
     }
 
-    fn map_approx_unary<F, G>(x: Expr, f: F, g: G) -> Expr
+    fn map_approx_unary<F, G>(x: Self, f: F, g: G) -> Self
     where
         F: Fn(f64) -> f64,
-        G: Fn(Expr) -> Expr,
+        G: Fn(Self) -> Self,
     {
         let xa = x.approx();
 
-        if let Expr::Num(n) = xa.clone() {
-            let nf = frac2f64(n);
+        if let Self::Num(n) = xa.clone() {
+            let nf = frac2f64(&n);
             let rf = f(nf);
             if let Some(r) = BigRational::from_float(rf) {
-                return Expr::Num(r);
+                return Self::Num(r);
             }
         }
 
@@ -69,13 +71,14 @@ impl Expr {
     }
 
     /// Reduce `self` by approximating. For example, turns
+    #[must_use]
     pub fn approx(self) -> Self {
         match self {
-            n @ Self::Num(_) | n @ Self::Var(_) | n @ Self::Const(_) => n,
-            Self::Sum(ts) => ts.into_iter().map(|t| t.approx()).sum(),
-            Self::Product(fs) => fs.into_iter().map(|f| f.approx()).product(),
-            Self::Power(b, e) => Self::map_approx_binary(*b, *e, |b, e| b.powf(e), |b, e| b.pow(e)),
-            Self::Log(b, a) => Self::map_approx_binary(*b, *a, |b, a| b.log(a), |b, a| b.log(a)),
+            n @ (Self::Num(_) | Self::Var(_) | Self::Const(_)) => n,
+            Self::Sum(ts) => ts.into_iter().map(Self::approx).sum(),
+            Self::Product(fs) => fs.into_iter().map(Self::approx).product(),
+            Self::Power(b, e) => Self::map_approx_binary(*b, *e, f64::powf, Self::pow),
+            Self::Log(b, a) => Self::map_approx_binary(*b, *a, f64::log, Self::log),
             Self::Mod(n, d) => Self::map_approx_binary(*n, *d, |n, d| n % d, |n, d| n % d),
             Self::Sin(x, m) => Self::map_approx_unary(
                 *x,
@@ -121,7 +124,7 @@ impl TryFrom<Expr> for f64 {
 
     fn try_from(value: Expr) -> Result<Self, Self::Error> {
         if let Expr::Num(n) = value.approx() {
-            Ok(frac2f64(n))
+            Ok(frac2f64(&n))
         } else {
             Err(())
         }

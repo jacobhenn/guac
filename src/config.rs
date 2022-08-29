@@ -5,7 +5,10 @@ use std::{
 
 use num::One;
 
-use crate::{radix::{self, Radix}, expr::{Expr, constant::Const}};
+use crate::{
+    expr::{constant::Const, Expr},
+    radix::{self, Radix},
+};
 
 /// The configuration stored in `State` which will be read from a config file in the future.
 pub struct Config {
@@ -79,7 +82,7 @@ impl AngleMeasure {
 
 impl AngleMeasure {
     /// Return how many of this angle measure make up a full turn.
-    pub fn full_turn_f64(self) -> f64 {
+    pub const fn full_turn_f64(self) -> f64 {
         match self {
             AngleMeasure::Radian => std::f64::consts::TAU,
             AngleMeasure::Turn => 1.,

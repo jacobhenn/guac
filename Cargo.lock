@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "guac"
-version = "0.2.0-3"
+version = "0.2.0-4"
 dependencies = [
  "anyhow",
  "argh",

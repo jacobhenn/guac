@@ -99,7 +99,7 @@ impl<'a> State<'a> {
                 } else {
                     self.apply_binary(|x, y| x - y, |_, _| None);
                 }
-            },
+            }
             KeyCode::Char('*') => self.apply_binary(|x, y| x * y, |_, _| None),
             KeyCode::Char('/') => self.apply_binary(
                 |x, y| x / y,
