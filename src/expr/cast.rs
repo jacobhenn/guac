@@ -70,11 +70,16 @@ impl Expr {
         Self::Num(BigRational::from(BigInt::from(i.into())))
     }
 
-    /// Reduce `self` by approximating. For example, turns
+    /// Reduce `self` by approximating.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if given an `Expr::Const(c)` such that `!f64::from(c).is_finite()`.
     #[must_use]
     pub fn approx(self) -> Self {
         match self {
-            n @ (Self::Num(_) | Self::Var(_) | Self::Const(_)) => n,
+            n @ (Self::Num(_) | Self::Var(_)) => n,
+            Self::Const(c) => Self::Num(BigRational::from_float(f64::from(c)).unwrap()),
             Self::Sum(ts) => ts.into_iter().map(Self::approx).sum(),
             Self::Product(fs) => fs.into_iter().map(Self::approx).product(),
             Self::Power(b, e) => Self::map_approx_binary(*b, *e, f64::powf, Self::pow),
