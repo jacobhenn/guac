@@ -5,7 +5,7 @@ use num::{traits::Inv, BigRational, One, Signed};
 use crate::{
     config::Config,
     expr::cast,
-    radix::{self, Radix},
+    radix::Radix,
 };
 
 use super::Expr;
@@ -196,7 +196,7 @@ impl Expr {
             } else {
                 format!("{radix}#")
             }
-        } else if config.radix == radix::DECIMAL {
+        } else if config.radix == Radix::DECIMAL {
             String::new()
         } else {
             "dec#".to_string()

@@ -29,32 +29,32 @@ pub const DIGITS: [char; 64] = [
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Radix(usize);
 
-/// bin / 2: base dec#2
-pub const BINARY: Radix = Radix(2);
-/// tri / 3: base dec#3
-pub const TRINARY: Radix = Radix(3);
-/// qua / 4: base dec#4
-pub const QUATERNARY: Radix = Radix(4);
-/// sex / 6: base dec#6
-pub const SEXIMAL: Radix = Radix(6);
-/// oct / 8: base dec#8
-pub const OCTAL: Radix = Radix(8);
-/// dec / a: base dec#10
-pub const DECIMAL: Radix = Radix(10);
-/// doz / c: base dec#12
-pub const DOZENAL: Radix = Radix(12);
-/// hex / g: base dec#16
-pub const HEX: Radix = Radix(16);
-/// ttr / w: base dec#32
-pub const TETROCTAL: Radix = Radix(32);
-/// nif / A: base dec#36
-pub const NIFTIMAL: Radix = Radix(36);
-/// heg / Y: base dec#60
-pub const HEXAGESIMAL: Radix = Radix(60);
-/// occ: base dec#64
-pub const OCTOCTAL: Radix = Radix(64);
-
 impl Radix {
+    /// bin / 2: base dec#2
+    pub const BINARY: Radix = Radix(2);
+    /// tri / 3: base dec#3
+    pub const TRINARY: Radix = Radix(3);
+    /// qua / 4: base dec#4
+    pub const QUATERNARY: Radix = Radix(4);
+    /// sex / 6: base dec#6
+    pub const SEXIMAL: Radix = Radix(6);
+    /// oct / 8: base dec#8
+    pub const OCTAL: Radix = Radix(8);
+    /// dec / a: base dec#10
+    pub const DECIMAL: Radix = Radix(10);
+    /// doz / c: base dec#12
+    pub const DOZENAL: Radix = Radix(12);
+    /// hex / g: base dec#16
+    pub const HEX: Radix = Radix(16);
+    /// ttr / w: base dec#32
+    pub const TETROCTAL: Radix = Radix(32);
+    /// nif / A: base dec#36
+    pub const NIFTIMAL: Radix = Radix(36);
+    /// heg / Y: base dec#60
+    pub const HEXAGESIMAL: Radix = Radix(60);
+    /// occ: base dec#64
+    pub const OCTOCTAL: Radix = Radix(64);
+
     /// Create a valid Radix from an integer.
     pub fn from_int<I>(n: I) -> Option<Self>
     where

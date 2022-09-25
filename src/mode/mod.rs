@@ -87,7 +87,7 @@ impl Display for Mode {
 impl<'a> State<'a> {
     /// If the current radix is greater than decimal, set the mode to input. Else, set the mode to normal.
     pub fn reset_mode(&mut self) {
-        if self.input_radix.unwrap_or(self.config.radix) > radix::DECIMAL {
+        if self.input_radix.unwrap_or(self.config.radix) > Radix::DECIMAL {
             self.mode = Mode::Insert;
         } else {
             self.mode = Mode::Normal;

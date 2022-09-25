@@ -1,4 +1,7 @@
-use crate::config::AngleMeasure;
+use crate::{
+    config::{AngleMeasure, Config},
+    radix::Radix,
+};
 
 use super::{constant::Const, Expr};
 
@@ -38,6 +41,12 @@ impl Expr {
             let rf = f(mf, nf);
             if let Some(r) = BigRational::from_float(rf) {
                 return Self::Num(r);
+            } else if !rf.is_finite() {
+                unreachable!(
+                    "domain checks failed to detect non-finite result ({rf:?}) in binary operation {}",
+                    g(Expr::Var(String::from("x")), Expr::Var(String::from("y")))
+                        .display(true, Radix::DECIMAL, &Config::default()),
+                );
             }
         }
 
@@ -56,6 +65,12 @@ impl Expr {
             let rf = f(nf);
             if let Some(r) = BigRational::from_float(rf) {
                 return Self::Num(r);
+            } else if !rf.is_finite() {
+                unreachable!(
+                    "domain checks failed to detect non-finite result ({rf:?}) in unary operation on {}",
+                    g(Expr::Var(String::from("x")))
+                        .display(true, Radix::DECIMAL, &Config::default()),
+                );
             }
         }
 
@@ -107,12 +122,12 @@ impl Expr {
             ),
             Self::Acos(x, m) => Self::map_approx_unary(
                 *x,
-                |x| convert_angle_f64(x.asin(), AngleMeasure::Radian, m),
+                |x| convert_angle_f64(x.acos(), AngleMeasure::Radian, m),
                 |x| x.acos(m),
             ),
             Self::Atan(x, m) => Self::map_approx_unary(
                 *x,
-                |x| convert_angle_f64(x.asin(), AngleMeasure::Radian, m),
+                |x| convert_angle_f64(x.atan(), AngleMeasure::Radian, m),
                 |x| x.atan(m),
             ),
         }

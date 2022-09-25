@@ -7,7 +7,7 @@ use num::One;
 
 use crate::{
     expr::{constant::Const, Expr},
-    radix::{self, Radix},
+    radix::Radix,
 };
 
 /// The configuration stored in `State` which will be read from a config file in the future.
@@ -23,7 +23,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             angle_measure: AngleMeasure::Radian,
-            radix: radix::DECIMAL,
+            radix: Radix::DECIMAL,
         }
     }
 }
