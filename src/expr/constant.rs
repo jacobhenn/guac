@@ -3,8 +3,12 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+#[cfg(test)]
+use proptest_derive::Arbitrary;
+
 /// Numerous common mathematical and physical constants.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub enum Const {
     /// π ≈ 3.142: The ratio of a circle's circumfrence to its diameter.
     Pi,

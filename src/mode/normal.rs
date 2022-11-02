@@ -103,21 +103,21 @@ impl<'a> State<'a> {
             KeyCode::Char('*') => self.apply_binary(|x, y| x * y, |_, _| None),
             KeyCode::Char('/') => self.apply_binary(
                 |x, y| x / y,
-                |_, y| y.is_zero().then(|| SoftError::DivideByZero),
+                |_, y| y.is_zero().then_some(SoftError::DivideByZero),
             ),
             KeyCode::Char('^') => self.apply_binary(Pow::pow, |x, y| {
-                (x.is_zero() && y.is_negative()).then(|| SoftError::DivideByZero)
+                (x.is_zero() && y.is_negative()).then_some(SoftError::DivideByZero)
             }),
             KeyCode::Char('g') => self.apply_unary(|x| x.log(Expr::Const(Const::E)), |_| None),
             KeyCode::Char('%') => self.apply_binary(
                 |x, y| x % y,
-                |_, y| y.is_zero().then(|| SoftError::DivideByZero),
+                |_, y| y.is_zero().then_some(SoftError::DivideByZero),
             ),
             KeyCode::Char('r') => {
-                self.apply_unary(Expr::sqrt, |x| x.is_negative().then(|| SoftError::Complex));
+                self.apply_unary(Expr::sqrt, |x| x.is_negative().then_some(SoftError::Complex));
             }
             KeyCode::Char('`') => {
-                self.apply_unary(Inv::inv, |x| x.is_zero().then(|| SoftError::DivideByZero));
+                self.apply_unary(Inv::inv, |x| x.is_zero().then_some(SoftError::DivideByZero));
             }
             KeyCode::Char('~') => self.apply_unary(Neg::neg, |_| None),
             KeyCode::Char('\\') => self.apply_unary(|x| x.abs(), |_| None),
@@ -136,7 +136,7 @@ impl<'a> State<'a> {
                     |x| {
                         (x.clone().into_turns(angle_measure) % Expr::from((1, 2))
                             == Expr::from((1, 4)))
-                        .then(|| SoftError::BadTan)
+                        .then_some(SoftError::BadTan)
                     },
                 );
             }
@@ -146,7 +146,7 @@ impl<'a> State<'a> {
                     |x| x.asin(angle_measure),
                     |x| {
                         (!x.contains_var() && (x >= &Expr::one() || x <= &Expr::one().neg()))
-                            .then(|| SoftError::Complex)
+                            .then_some(SoftError::Complex)
                     },
                 );
             }
@@ -156,7 +156,7 @@ impl<'a> State<'a> {
                     |x| x.acos(angle_measure),
                     |x| {
                         (!x.contains_var() && (x <= &Expr::one() || x >= &Expr::one().neg()))
-                            .then(|| SoftError::Complex)
+                            .then_some(SoftError::Complex)
                     },
                 );
             }
@@ -223,7 +223,7 @@ impl<'a> State<'a> {
             }
             KeyCode::Char('G') => self.apply_binary(
                 |x, y| y.log(x),
-                |_, y| y.is_negative().then(|| SoftError::BadLog),
+                |_, y| y.is_negative().then_some(SoftError::BadLog),
             ),
             KeyCode::Char('R') => self.apply_unary(|x| x.pow(2.into()), |_| None),
             KeyCode::Char(c)

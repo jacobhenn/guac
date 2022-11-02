@@ -1,18 +1,21 @@
 use super::Expr;
 use num::{
-    rational::ParseRatioError,
     traits::{Inv, Pow},
     BigRational, Num, One, Signed, Zero,
 };
 use std::{
     iter::{Product, Sum},
-    ops::{Div, DivAssign, Neg, Rem, RemAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
 };
 
-impl Expr {
+impl<N> Expr<N> {
     /// Take the logarithm of self in base `base`. Perform obvious simplifications.
     #[must_use]
-    pub fn log(self, base: Self) -> Self {
+    pub fn log(self, base: Self) -> Self
+    where
+        N: PartialEq,
+        Self: Mul<Output = Self>,
+    {
         match (self, base) {
             (Self::Power(b, e), base) => {
                 if base == *b {
@@ -24,7 +27,12 @@ impl Expr {
             (other, base) => Self::Log(Box::new(base), Box::new(other)),
         }
     }
+}
 
+impl<N> Expr<N>
+where
+    Self: Pow<Self, Output = Self> + From<(i32, i32)>,
+{
     /// Take the square root of this expression.
     #[must_use]
     pub fn sqrt(self) -> Self {
@@ -32,9 +40,13 @@ impl Expr {
     }
 }
 
-impl Zero for Expr {
+impl<N> Zero for Expr<N>
+where
+    Self: Add<Output = Self>,
+    N: Zero,
+{
     fn zero() -> Self {
-        Self::Num(BigRational::zero())
+        Self::Num(N::zero())
     }
 
     fn is_zero(&self) -> bool {
@@ -49,9 +61,13 @@ impl Zero for Expr {
     }
 }
 
-impl One for Expr {
+impl<N> One for Expr<N>
+where
+    N: One + Zero + PartialEq + Clone + for<'a> Product<&'a N> + AddAssign,
+    Self: Pow<Self, Output = Self> + From<i32>,
+{
     fn one() -> Self {
-        Self::Num(BigRational::one())
+        Self::Num(N::one())
     }
     fn is_one(&self) -> bool {
         match self {
@@ -64,35 +80,100 @@ impl One for Expr {
     }
 }
 
-impl Sub for Expr {
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl<N> Sub for Expr<N>
+where
+    Self: Add<Output = Self> + Neg<Output = Self>,
+{
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        self + rhs * Self::from_int(-1)
+        self + rhs.neg()
     }
 }
 
-impl SubAssign for Expr {
+#[allow(clippy::suspicious_op_assign_impl)]
+impl<N> SubAssign for Expr<N>
+where
+    Self: Neg<Output = Self> + AddAssign,
+{
     fn sub_assign(&mut self, rhs: Self) {
-        *self += rhs * Self::from_int(-1);
+        *self += rhs.neg();
     }
 }
 
-impl Div for Expr {
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl<N> Div for Expr<N>
+where
+    Self: Mul<Output = Self> + Inv<Output = Self> + PartialEq + One,
+{
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        self * rhs.pow(Self::from_int(-1))
+        // TODO: this is disgusting
+        if self == rhs {
+            return Self::one();
+        }
+
+        self * rhs.inv()
     }
 }
 
-impl DivAssign for Expr {
+#[allow(clippy::suspicious_op_assign_impl)]
+impl<N> DivAssign for Expr<N>
+where
+    Self: MulAssign + Inv<Output = Self>,
+{
     fn div_assign(&mut self, rhs: Self) {
-        *self *= rhs.pow(Self::from_int(-1));
+        *self *= rhs.inv();
     }
 }
 
-impl Pow<Self> for Expr {
+trait NumPow: Sized {
+    fn pow(self, rhs: Self) -> Expr<Self>;
+}
+
+impl NumPow for BigRational {
+    fn pow(self, rhs: Self) -> Expr<Self> {
+        if rhs.is_integer() {
+            Expr::Num(<Self as Pow<_>>::pow(self, rhs.numer()))
+        } else {
+            Expr::Power(Box::new(Expr::Num(self)), Box::new(Expr::Num(rhs)))
+        }
+    }
+}
+
+impl NumPow for i32 {
+    fn pow(self, rhs: Self) -> Expr<Self> {
+        if rhs.is_positive() {
+            Expr::Num(<Self as Pow<_>>::pow(self, rhs.unsigned_abs()))
+        } else {
+            Expr::Power(Box::new(Expr::Num(self)), Box::new(Expr::Num(rhs)))
+        }
+    }
+}
+
+macro_rules! impl_num_pow {
+    ( $(for $t:ty);+ ) => {
+        $(
+            impl NumPow for $t {
+                fn pow(self, rhs: Self) -> Expr<Self> {
+                    Expr::Num(<Self as Pow<_>>::pow(self, rhs))
+                }
+            }
+        )+
+    }
+}
+
+impl_num_pow! {
+    for f32; for f64
+}
+
+impl<N> Pow<Self> for Expr<N>
+where
+    N: NumPow + Zero + One + Clone + for<'a> Product<&'a N> + PartialEq + AddAssign,
+    Self: From<i32>
+{
     type Output = Self;
 
     fn pow(mut self, mut rhs: Self) -> Self::Output {
@@ -100,13 +181,7 @@ impl Pow<Self> for Expr {
         rhs.correct();
 
         let mut out = match (self, rhs) {
-            (Self::Num(b), Self::Num(e)) => {
-                if e.is_integer() {
-                    Self::Num(b.pow(e.numer()))
-                } else {
-                    Self::Power(Box::new(Self::Num(b)), Box::new(Self::Num(e)))
-                }
-            }
+            (Self::Num(b), Self::Num(e)) => <N as NumPow>::pow(b, e),
             (Self::Product(fs), rhs) => fs.into_iter().map(|f| f.pow(rhs.clone())).product(),
             (Self::Power(b, e), f) => Self::Power(b, Box::new(*e * f)),
             (b, e) => Self::Power(Box::new(b), Box::new(e)),
@@ -117,23 +192,33 @@ impl Pow<Self> for Expr {
     }
 }
 
-impl Neg for Expr {
+impl<N> Neg for Expr<N>
+where
+    Self: Mul<Output = Self> + From<i32>,
+{
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        self * (-1).into()
+        self * Self::from(-1)
     }
 }
 
-impl Inv for Expr {
+impl<N> Inv for Expr<N>
+where
+    Self: Pow<Self, Output = Self> + From<i32>,
+{
     type Output = Self;
 
     fn inv(self) -> Self::Output {
-        self.pow((-1).into())
+        self.pow(Self::from(-1))
     }
 }
 
-impl Rem for Expr {
+impl<N> Rem for Expr<N>
+where
+    N: Rem<Output = N>,
+    Self: PartialOrd + Clone + Product + Mul<Output = Self>,
+{
     type Output = Self;
 
     fn rem(self, rhs: Self) -> Self::Output {
@@ -169,41 +254,61 @@ impl Rem for Expr {
     }
 }
 
-impl RemAssign for Expr {
+impl<N> RemAssign for Expr<N>
+where
+    Self: Rem<Output = Self>,
+    N: Clone,
+{
     fn rem_assign(&mut self, rhs: Self) {
         *self = self.clone() % rhs;
     }
 }
 
-impl Product for Expr {
+impl<N> Product for Expr<N>
+where
+    Self: One,
+{
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(One::one(), |acc, i| acc * i)
+        iter.fold(Self::one(), |acc, i| acc * i)
     }
 }
 
-impl Sum for Expr {
+impl<N> Sum for Expr<N>
+where
+    Self: Zero,
+{
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Zero::zero(), |acc, i| acc + i)
+        iter.fold(Self::zero(), |acc, i| acc + i)
     }
 }
 
-impl PartialOrd for Expr {
+impl<N> PartialOrd for Expr<N>
+where
+    N: PartialOrd,
+{
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        f64::try_from(self.clone())
-            .ok()?
-            .partial_cmp(&f64::try_from(other.clone()).ok()?)
+        self.num()
+            .and_then(|n| other.num().and_then(|m| n.partial_cmp(m)))
     }
 }
 
-impl Num for Expr {
-    type FromStrRadixErr = ParseRatioError;
+impl<N> Num for Expr<N>
+where
+    N: Num + Clone + for<'a> Product<&'a N> + AddAssign,
+    Self: Pow<Self, Output = Self> + From<i32> + Rem<Output = Self>,
+{
+    type FromStrRadixErr = N::FromStrRadixErr;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        Ok(Self::Num(BigRational::from_str_radix(str, radix)?))
+        Ok(Self::Num(N::from_str_radix(str, radix)?))
     }
 }
 
-impl Signed for Expr {
+impl<N> Signed for Expr<N>
+where
+    Self: Num + PartialOrd + Clone + From<i32>,
+    N: Signed,
+{
     fn abs(&self) -> Self {
         if self.is_negative() {
             self.clone().neg()

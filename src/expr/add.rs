@@ -1,11 +1,12 @@
 use super::Expr;
-use num::{BigRational, One};
+use num::{One, Zero, traits::Pow};
 use std::{
     clone::Clone,
+    iter::Product,
     ops::{Add, AddAssign},
 };
 
-impl Expr {
+impl<N> Expr<N> {
     /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`
     pub fn terms(&self) -> Vec<&Self> {
         match self {
@@ -31,7 +32,10 @@ impl Expr {
     }
 
     /// Does this expression have the same variables and exponents as another expression?
-    pub fn is_like_term(&self, rhs: &Self) -> bool {
+    pub fn is_like_term(&self, rhs: &Self) -> bool
+    where
+        N: PartialEq,
+    {
         let self_factors = self.factors();
         let rhs_factors = rhs.factors();
         rhs_factors
@@ -43,36 +47,43 @@ impl Expr {
     }
 
     /// Return an immutable reference to the rational factor of this expression. If the rational factor is `1`, `None` will be returned, since the `1` isn't actually stored in the expression. **Expression must be `correct`ed**.
-    pub fn coefficient(&self) -> Option<&BigRational> {
+    pub fn coefficient(&self) -> Option<&N> {
         self.factors().into_iter().find_map(Self::num)
     }
 
     /// Return a mutable reference to the rational factor of this expression. If the rational factor is `1`, `None` will be returned, since the `1` isn't actually stored in the expression. **Expression must be `correct`ed**.
-    pub fn coefficient_mut(&mut self) -> Option<&mut BigRational> {
+    pub fn coefficient_mut(&mut self) -> Option<&mut N> {
         self.factors_mut().into_iter().find_map(Self::num_mut)
     }
 
     /// Return the rational factor of this expression. If the rational factor is `1`, `None` will be returned, since the `1` isn't actually stored in the expression. **Expression must be `correct`ed**.
-    pub fn into_coefficient(self) -> Option<BigRational> {
+    pub fn into_coefficient(self) -> Option<N> {
         self.into_factors().into_iter().find_map(Self::into_num)
     }
 
     /// Add two expressions. **If they are not like terms, this function will return an incorrect result**.
-    pub fn combine_like_terms(&mut self, rhs: Self) {
+    pub fn combine_like_terms(&mut self, rhs: Self)
+    where
+        N: One + Add<Output = N> + AddAssign + Clone,
+        Self: From<i32>,
+    {
         if let Some(c) = self.coefficient_mut() {
-            *c += rhs.coefficient().unwrap_or(&BigRational::one());
+            *c += rhs.coefficient().cloned().unwrap_or_else(N::one);
         } else if let Some(c) = rhs.into_coefficient() {
-            self.push_factor(Self::Num(c + BigRational::one()));
+            self.push_factor(Self::Num(c + N::one()));
         } else {
             match self {
-                Self::Product(fs) => fs.push(Self::from_int(2)),
-                other => *other = Self::Product(vec![Self::from_int(2), other.clone()]),
+                Self::Product(fs) => fs.push(Self::from(2)),
+                other => *other = Self::Product(vec![Self::from(2), other.clone()]),
             }
         }
     }
 
     /// Naively add `rhs` to `self` without performing any simplifications. If `self` is a sum, append to existing term list.
-    pub fn push_term(&mut self, rhs: Self) {
+    pub fn push_term(&mut self, rhs: Self)
+    where
+        Self: Clone,
+    {
         match self {
             Self::Sum(ts) => ts.push(rhs),
             other => *other = Self::Sum(vec![rhs, other.clone()]),
@@ -80,7 +91,10 @@ impl Expr {
     }
 }
 
-impl Add for Expr {
+impl<N> Add for Expr<N>
+where
+    Self: AddAssign,
+{
     type Output = Self;
 
     fn add(mut self, rhs: Self) -> Self::Output {
@@ -89,7 +103,11 @@ impl Add for Expr {
     }
 }
 
-impl AddAssign for Expr {
+impl<N> AddAssign for Expr<N>
+where
+    N: PartialEq + One + Add<Output = N> + AddAssign + Clone + Zero + for<'a> Product<&'a N>,
+    Self: Clone + From<i32> + Pow<Self, Output = Self>,
+{
     fn add_assign(&mut self, rhs: Self) {
         let self_terms = self.terms();
         let (like, unlike): (Vec<Self>, Vec<Self>) = rhs

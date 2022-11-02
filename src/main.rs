@@ -139,7 +139,7 @@ impl Display for SoftError {
 /// An expression, along with other data necessary for displaying it but not for doing math with it.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StackItem {
-    expr: Expr,
+    expr: Expr<BigRational>,
     radix: Radix,
     approx: bool,
     exact_str: String,
@@ -148,24 +148,20 @@ pub struct StackItem {
 
 impl StackItem {
     /// Create a new `StackItem` and cache its rendered strings.
-    pub fn new(approx: bool, expr: &Expr, radix: Radix, config: &Config) -> Self {
+    pub fn new(approx: bool, expr: &Expr<BigRational>, radix: Radix, config: &Config) -> Self {
         Self {
             expr: expr.clone(),
             radix,
             approx,
-            exact_str: expr.display(true, radix, config),
-            approx_str: expr.clone().approx().display(false, radix, config),
+            exact_str: expr.display(radix, config),
+            approx_str: expr.clone().approx().display(radix, config),
         }
     }
 
     /// Update the cached strings in a stack item.
     pub fn rerender(&mut self, config: &Config) {
-        self.exact_str = self.expr.display(true, self.radix, config);
-        self.approx_str = self
-            .expr
-            .clone()
-            .approx()
-            .display(false, self.radix, config);
+        self.exact_str = self.expr.display(self.radix, config);
+        self.approx_str = self.expr.clone().approx().display(self.radix, config);
     }
 }
 
@@ -350,7 +346,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    fn push_expr(&mut self, expr: &Expr, radix: Radix) {
+    fn push_expr(&mut self, expr: &Expr<BigRational>, radix: Radix) {
         self.stack.insert(
             self.select_idx.unwrap_or(self.stack.len()),
             StackItem::new(false, expr, radix, &self.config),
@@ -382,7 +378,8 @@ impl<'a> State<'a> {
         }
     }
 
-    fn parse_expr(&self, s: &str) -> Result<Expr, SoftError> {
+    // TODO: should this return an Expr<f64> if it can't parse an int?
+    fn parse_expr(&self, s: &str) -> Result<Expr<BigRational>, SoftError> {
         let radix = self.input_radix.unwrap_or(self.config.radix);
 
         if let Some(int) = radix.parse_bigint(s) {
@@ -472,8 +469,8 @@ impl<'a> State<'a> {
 
     fn apply_binary<F, G>(&mut self, f: F, are_in_domain: G)
     where
-        F: Fn(Expr, Expr) -> Expr,
-        G: Fn(&Expr, &Expr) -> Option<SoftError>,
+        F: Fn(Expr<BigRational>, Expr<BigRational>) -> Expr<BigRational>,
+        G: Fn(&Expr<BigRational>, &Expr<BigRational>) -> Option<SoftError>,
     {
         let did_push_input = if self.stack.is_empty() || self.select_idx.is_some() {
             false
@@ -515,8 +512,8 @@ impl<'a> State<'a> {
 
     fn apply_unary<F, G>(&mut self, f: F, is_in_domain: G)
     where
-        F: Fn(Expr) -> Expr,
-        G: Fn(&Expr) -> Option<SoftError>,
+        F: Fn(Expr<BigRational>) -> Expr<BigRational>,
+        G: Fn(&Expr<BigRational>) -> Option<SoftError>,
     {
         let did_push_input = if self.select_idx.is_some() {
             false

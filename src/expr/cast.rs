@@ -3,102 +3,112 @@ use crate::{
     radix::Radix,
 };
 
-use super::{constant::Const, Expr};
+use super::Expr;
 
 use num::{traits::Pow, BigInt, BigRational, ToPrimitive};
 
-/// Turn a `BigRational` into an `f64`.
-#[allow(clippy::missing_panics_doc)]
-pub fn frac2f64(n: &BigRational) -> f64 {
-    let max = BigInt::from(i128::MAX);
-
-    let mut numer = n.numer().clone();
-    let mut denom = n.denom().clone();
-
-    while numer > max || denom > max {
-        numer /= 2;
-        denom /= 2;
+impl From<i32> for Expr<BigRational> {
+    fn from(n: i32) -> Self {
+        Self::Num(BigRational::from(BigInt::from(n)))
     }
-
-    // these assertions cannot panic, because we made sure that `numer` and denom are `<= i128::MAX`.
-    let ni = numer.to_i128().unwrap();
-    let di = denom.to_i128().unwrap();
-
-    ni as f64 / di as f64
 }
 
-impl Expr {
-    fn map_approx_binary<F, G>(x: Self, y: Self, f: F, g: G) -> Self
+impl From<(i32, i32)> for Expr<BigRational> {
+    fn from((n, m): (i32, i32)) -> Self {
+        Self::Num(BigRational::from((BigInt::from(n), BigInt::from(m))))
+    }
+}
+
+impl From<(i32, i32)> for Expr<f64> {
+    fn from((n, m): (i32, i32)) -> Self {
+        Self::Num(f64::from(n) / f64::from(m))
+    }
+}
+
+macro_rules! impl_from_i32 {
+    ( $(for $t:ty);+ ) => {
+        $(
+            impl From<i32> for Expr<$t> {
+                fn from(n: i32) -> Self {
+                    Self::Num(<$t>::from(n))
+                }
+            }
+        )+
+    }
+}
+
+impl_from_i32! {
+    for i32; for i64; for i128; for f64
+}
+
+impl Expr<BigRational> {
+    fn map_approx_binary<F, G>(x: Self, y: Self, f: F, g: G) -> Expr<f64>
     where
         F: Fn(f64, f64) -> f64,
-        G: Fn(Self, Self) -> Self,
+        G: Fn(Expr<f64>, Expr<f64>) -> Expr<f64>,
     {
         let xa = x.approx();
         let ya = y.approx();
 
-        if let (Self::Num(m), Self::Num(n)) = (xa.clone(), ya.clone()) {
-            let (mf, nf) = (frac2f64(&m), frac2f64(&n));
+        if let (Expr::<f64>::Num(m), Expr::<f64>::Num(n)) = (xa.clone(), ya.clone()) {
+            let (mf, nf) = (m.to_f64().unwrap(), n.to_f64().unwrap());
             let rf = f(mf, nf);
-            if let Some(r) = BigRational::from_float(rf) {
-                return Self::Num(r);
-            } else if !rf.is_finite() {
+            if !rf.is_finite() {
                 unreachable!(
                     "domain checks failed to detect non-finite result ({rf:?}) in binary operation {}",
                     g(Expr::Var(String::from("x")), Expr::Var(String::from("y")))
-                        .display(true, Radix::DECIMAL, &Config::default()),
+                        .display(Radix::DECIMAL, &Config::default()),
                 );
             }
+
+            return Expr::<f64>::Num(rf);
         }
 
         g(xa, ya)
     }
 
-    fn map_approx_unary<F, G>(x: Self, f: F, g: G) -> Self
+    fn map_approx_unary<F, G>(x: Self, f: F, g: G) -> Expr<f64>
     where
         F: Fn(f64) -> f64,
-        G: Fn(Self) -> Self,
+        G: Fn(Expr<f64>) -> Expr<f64>,
     {
         let xa = x.approx();
 
-        if let Self::Num(n) = xa.clone() {
-            let nf = frac2f64(&n);
+        if let Expr::<f64>::Num(n) = xa {
+            let nf = n.to_f64().unwrap();
             let rf = f(nf);
-            if let Some(r) = BigRational::from_float(rf) {
-                return Self::Num(r);
-            } else if !rf.is_finite() {
+            if !rf.is_finite() {
                 unreachable!(
                     "domain checks failed to detect non-finite result ({rf:?}) in unary operation on {}",
                     g(Expr::Var(String::from("x")))
-                        .display(true, Radix::DECIMAL, &Config::default()),
+                        .display(Radix::DECIMAL, &Config::default()),
                 );
             }
+
+            return Expr::<f64>::Num(rf);
         }
 
         g(xa)
     }
+}
 
-    /// If something can be an integer, it can be an Expr.
-    pub fn from_int<I>(i: I) -> Self
-    where
-        I: Into<i128>,
-    {
-        Self::Num(BigRational::from(BigInt::from(i.into())))
-    }
-
+impl Expr<BigRational> {
     /// Reduce `self` by approximating.
     ///
     /// # Panics
     ///
     /// Will panic if given an `Expr::Const(c)` such that `!f64::from(c).is_finite()`.
     #[must_use]
-    pub fn approx(self) -> Self {
+    pub fn approx(self) -> Expr<f64> {
         match self {
-            n @ (Self::Num(_) | Self::Var(_)) => n,
-            Self::Const(c) => Self::Num(BigRational::from_float(f64::from(c)).unwrap()),
+            // `<BigRational as ToPrimitive>::to_f64` cannot panic
+            Self::Num(n) => Expr::<f64>::Num(n.to_f64().unwrap()),
+            Self::Var(n) => Expr::<f64>::Var(n),
+            Self::Const(c) => Expr::<f64>::Num(f64::from(c)),
             Self::Sum(ts) => ts.into_iter().map(Self::approx).sum(),
             Self::Product(fs) => fs.into_iter().map(Self::approx).product(),
-            Self::Power(b, e) => Self::map_approx_binary(*b, *e, f64::powf, Self::pow),
-            Self::Log(b, a) => Self::map_approx_binary(*b, *a, f64::log, Self::log),
+            Self::Power(b, e) => Self::map_approx_binary(*b, *e, f64::powf, Expr::<f64>::pow),
+            Self::Log(b, a) => Self::map_approx_binary(*b, *a, f64::log, Expr::<f64>::log),
             Self::Mod(n, d) => Self::map_approx_binary(*n, *d, |n, d| n % d, |n, d| n % d),
             Self::Sin(x, m) => Self::map_approx_unary(
                 *x,
@@ -139,37 +149,8 @@ pub fn convert_angle_f64(x: f64, from: AngleMeasure, to: AngleMeasure) -> f64 {
     (x / from.full_turn_f64()) * to.full_turn_f64()
 }
 
-impl TryFrom<Expr> for f64 {
-    type Error = ();
-
-    fn try_from(value: Expr) -> Result<Self, Self::Error> {
-        if let Expr::Num(n) = value.approx() {
-            Ok(frac2f64(&n))
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl From<Const> for Expr {
-    fn from(c: Const) -> Self {
-        Self::Const(c)
-    }
-}
-
-impl From<i128> for Expr {
-    fn from(i: i128) -> Self {
-        Self::Num(BigRational::from(BigInt::from(i)))
-    }
-}
-
-impl From<(i128, i128)> for Expr {
-    fn from((n, d): (i128, i128)) -> Self {
-        Self::Num(BigRational::from((BigInt::from(n), BigInt::from(d))))
-    }
-}
-
 /// Take a decimal number (like "5.64") and convert it to a rational number in lowest terms (in that case, 141/25).
+// FIXME: this parsing could be way better
 pub fn parse_decimal_rational(s: &str) -> Option<BigRational> {
     let sep: Vec<_> = s.split('.').collect();
 

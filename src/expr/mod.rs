@@ -1,7 +1,9 @@
+use std::iter::Product;
+
 use crate::config::AngleMeasure;
 
 use self::constant::Const;
-use num::{BigRational, One, Zero};
+use num::{One, Zero};
 
 /// Implementation of `Add` for `Expr`, along with helper types and functions for that purpose.
 pub mod add;
@@ -29,9 +31,9 @@ pub mod cast;
 
 /// A general-purpose type to store algebraic expressions.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expr {
+pub enum Expr<N> {
     /// A rational number.
-    Num(BigRational),
+    Num(N),
 
     /// A sum of terms (pairs of rational and non-rational factors).
     Sum(Vec<Self>),
@@ -73,24 +75,7 @@ pub enum Expr {
     Atan(Box<Self>, AngleMeasure),
 }
 
-impl Expr {
-    /// If this expression *contains* other `Expr`s, return a list of references to them.
-    // pub fn inners(&self) -> Option<Vec<&Expr>> {
-    //     match self {
-    //         Self::Num(_) => None,
-    //         Self::Sum(ts) => Some(ts.iter().collect()),
-    //         Self::Product(fs) => Some(fs.iter().collect()),
-    //         Self::Power(b, e) => Some(vec![b, e]),
-    //         Self::Log(b, a) => Some(vec![b, a]),
-    //         Self::Var(_) => None,
-    //         Self::Const(_) => None,
-    //         Self::Mod(n, d) => Some(vec![n, d]),
-    //         Self::Sin(a, _) => Some(vec![a]),
-    //         Self::Cos(a, _) => Some(vec![a]),
-    //         Self::Tan(a, _) => Some(vec![a]),
-    //     }
-    // }
-
+impl<N> Expr<N> {
     /// Are any of this expression's sub-expressions a variable?
     pub fn contains_var(&self) -> bool {
         match self {
@@ -146,7 +131,7 @@ impl Expr {
 
     /// Return the contents of this expression if it's a Num; if not, return None.
     #[allow(clippy::missing_const_for_fn)]
-    pub fn num(&self) -> Option<&BigRational> {
+    pub fn num(&self) -> Option<&N> {
         match self {
             Self::Num(n) => Some(n),
             _ => None,
@@ -154,7 +139,7 @@ impl Expr {
     }
 
     /// Return the contents of this expression if it's a Num; if not, return None.
-    pub fn num_mut(&mut self) -> Option<&mut BigRational> {
+    pub fn num_mut(&mut self) -> Option<&mut N> {
         match self {
             Self::Num(n) => Some(n),
             _ => None,
@@ -162,8 +147,9 @@ impl Expr {
     }
 
     /// Return the contents of this expression if it's a Num; if not, return None.
+    // this function cannot be `const`, but clippy thinks it can
     #[allow(clippy::missing_const_for_fn)]
-    pub fn into_num(self) -> Option<BigRational> {
+    pub fn into_num(self) -> Option<N> {
         match self {
             Self::Num(n) => Some(n),
             _ => None,
@@ -171,7 +157,11 @@ impl Expr {
     }
 
     /// Performs obvious and computationally inexpensive simplifications.
-    pub fn correct(&mut self) {
+    pub fn correct(&mut self)
+    where
+        N: Zero + One + Clone + for<'a> Product<&'a N> + PartialEq,
+        Self: One + Zero,
+    {
         match self {
             Self::Sum(ts) => {
                 for t in ts.iter_mut() {
@@ -189,7 +179,10 @@ impl Expr {
                     f.correct();
                 }
 
-                let c: BigRational = fs.iter_mut().filter_map(|f| f.num()).product();
+                let c: N = fs
+                    .iter_mut()
+                    .filter_map(|n| n.num() /* this can't be point-free :( */)
+                    .product();
                 fs.retain(|f| !f.is_num());
                 if c.is_zero() {
                     return self.set_zero();
