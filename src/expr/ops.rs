@@ -169,7 +169,7 @@ impl NumPow for BigRational {
         if rhs.is_integer() {
             Expr::Num(<Self as Pow<_>>::pow(self, rhs.numer()))
         } else if let Some(root) = try_perfect_nth_root(&self, rhs.denom()) {
-            Expr::Num(BigRational::from(root))
+            Expr::Num(Self::from(root))
         } else {
             Expr::Power(Box::new(Expr::Num(self)), Box::new(Expr::Num(rhs)))
         }

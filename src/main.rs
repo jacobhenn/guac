@@ -397,7 +397,7 @@ impl<'a> State<'a> {
 
     fn push_input(&mut self) -> bool {
         if self.input.is_empty() {
-            if self.input_radix == None {
+            if self.input_radix.is_none() {
                 return false;
             } else if let Some(i) = self.selected_or_last_idx() {
                 if let Some(x) = self.stack.get_mut(i) {

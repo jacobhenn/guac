@@ -1,3 +1,7 @@
+// clippy thinks that AngleMeasure should be named `Self` because of #[derive(Display)].
+// see https://github.com/rust-lang/rust-clippy/issues/9786
+#![allow(clippy::use_self)]
+
 use std::{str::FromStr, ops::Mul};
 
 use derive_more::Display;
