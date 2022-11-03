@@ -127,7 +127,7 @@ where
         + One
         + From<(i32, i32)>
         + Signed
-        + PartialOrd,
+        + PartialOrd
 {
     /// Take the sine of this expression as an angle in `measure`.
     #[must_use]
@@ -169,7 +169,7 @@ where
         let onehalf = Self::from((1, 2));
         if turns.is_negative() {
             return self.neg().generic_cos(measure);
-        } else if turns >= onehalf {
+        } else if turns > onehalf {
             return (Self::one() - turns).turns_to(measure).generic_cos(measure);
         } else if turns > Self::from((1, 4)) {
             return (onehalf - turns)
@@ -178,7 +178,7 @@ where
                 .neg();
         }
 
-        if turns.is_zero() {
+        if turns.is_zero() || turns == onehalf {
             Self::one()
         } else if turns == Self::from((1, 4)) {
             Self::zero()

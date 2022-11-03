@@ -140,7 +140,7 @@ where
     fn mul(self, rhs: Self) -> Self::Output {
         let mut out = Self::one();
 
-        // the combined factors of `self` and `rhs` that `res` will be procedurally multiplied by
+        // the combined factors of `self` and `rhs` that `out` will be procedurally multiplied by
         let mut factors = self.into_factors();
         factors.append(&mut rhs.into_factors());
 

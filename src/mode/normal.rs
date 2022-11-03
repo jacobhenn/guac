@@ -106,7 +106,13 @@ impl<'a> State<'a> {
                 |_, y| y.is_zero().then_some(SoftError::DivideByZero),
             ),
             KeyCode::Char('^') => self.apply_binary(Pow::pow, |x, y| {
-                (x.is_zero() && y.is_negative()).then_some(SoftError::DivideByZero)
+                if x.is_zero() && y.is_negative() {
+                    Some(SoftError::DivideByZero)
+                } else if x.is_negative() && y < &Expr::one() {
+                    Some(SoftError::Complex)
+                } else {
+                    None
+                }
             }),
             KeyCode::Char('g') => self.apply_unary(|x| x.log(Expr::Const(Const::E)), |_| None),
             KeyCode::Char('%') => self.apply_binary(
@@ -114,7 +120,9 @@ impl<'a> State<'a> {
                 |_, y| y.is_zero().then_some(SoftError::DivideByZero),
             ),
             KeyCode::Char('r') => {
-                self.apply_unary(Expr::sqrt, |x| x.is_negative().then_some(SoftError::Complex));
+                self.apply_unary(Expr::sqrt, |x| {
+                    x.is_negative().then_some(SoftError::Complex)
+                });
             }
             KeyCode::Char('`') => {
                 self.apply_unary(Inv::inv, |x| x.is_zero().then_some(SoftError::DivideByZero));

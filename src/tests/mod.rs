@@ -4,7 +4,7 @@ use crate::{config::AngleMeasure, expr::constant::Const, Expr};
 use num::{
     bigint::Sign,
     traits::{Pow, Zero},
-    BigInt, BigRational, One, Signed,
+    BigInt, BigRational, BigUint, One, Signed,
 };
 use proptest::prelude::*;
 use std::{
@@ -24,50 +24,65 @@ prop_compose! {
 }
 
 prop_compose! {
+    fn arb_biguint()(digits in prop::collection::vec(any::<u32>(), 0..4)) -> BigUint {
+        BigUint::from_slice(&digits)
+    }
+}
+
+prop_compose! {
     fn arb_bigint()(
         sign in arb_sign(),
-        digits in prop::collection::vec(any::<u32>(), 0..4),
+        uint in arb_biguint(),
     ) -> BigInt {
-        BigInt::from_slice(sign, &digits)
+        BigInt::from_biguint(sign, uint)
+    }
+}
+
+prop_compose! {
+    fn arb_nonzero_bigint()(
+        sign in arb_sign(),
+        uint in arb_biguint().prop_map(|i| i + BigUint::one()),
+    ) -> BigInt {
+        BigInt::from_biguint(sign, uint)
     }
 }
 
 prop_compose! {
     fn arb_bigrational()(
         numer in arb_bigint(),
-        denom in arb_bigint().prop_filter("denominator should not be 0", |i| !i.is_zero()),
+        denom in arb_nonzero_bigint(),
     ) -> BigRational {
         BigRational::from((numer, denom))
     }
 }
 
-fn arb_expr<N, S, F>(arb_n: F) -> impl Strategy<Value = Expr<N>>
-where
-    N: Debug + 'static,
-    S: Strategy<Value = N> + 'static,
-    F: Fn() -> S,
-{
-    let leaf = prop_oneof![
-        any::<Const>().prop_map(Expr::Const),
-        arb_n().prop_map(Expr::Num),
-        any::<String>().prop_map(Expr::Var),
-    ];
-    leaf.prop_recursive(8, 128, 10, |inner| {
-        prop_oneof![
-            prop::collection::vec(inner.clone(), 0..10).prop_map(Expr::Sum),
-            prop::collection::vec(inner.clone(), 0..10).prop_map(Expr::Product),
-            (inner.clone(), inner.clone()).prop_map(|(x, y)| Expr::Power(Box::new(x), Box::new(y))),
-            (inner.clone(), inner.clone()).prop_map(|(x, y)| Expr::Log(Box::new(x), Box::new(y))),
-            (inner.clone(), inner.clone()).prop_map(|(x, y)| Expr::Mod(Box::new(x), Box::new(y))),
-            (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Sin(Box::new(x), m)),
-            (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Cos(Box::new(x), m)),
-            (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Tan(Box::new(x), m)),
-            (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Asin(Box::new(x), m)),
-            (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Acos(Box::new(x), m)),
-            (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Atan(Box::new(x), m)),
-        ]
-    })
-}
+// fn arb_expr<N, S, F>(arb_n: F) -> impl Strategy<Value = Expr<N>>
+// where
+//     N: Debug + 'static,
+//     S: Strategy<Value = N> + 'static,
+//     F: Fn() -> S,
+// {
+//     let leaf = prop_oneof![
+//         any::<Const>().prop_map(Expr::Const),
+//         arb_n().prop_map(Expr::Num),
+//         any::<String>().prop_map(Expr::Var),
+//     ];
+//     leaf.prop_recursive(8, 128, 10, |inner| {
+//         prop_oneof![
+//             prop::collection::vec(inner.clone(), 0..10).prop_map(Expr::Sum),
+//             prop::collection::vec(inner.clone(), 0..10).prop_map(Expr::Product),
+//             (inner.clone(), inner.clone()).prop_map(|(x, y)| Expr::Power(Box::new(x), Box::new(y))),
+//             (inner.clone(), inner.clone()).prop_map(|(x, y)| Expr::Log(Box::new(x), Box::new(y))),
+//             (inner.clone(), inner.clone()).prop_map(|(x, y)| Expr::Mod(Box::new(x), Box::new(y))),
+//             (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Sin(Box::new(x), m)),
+//             (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Cos(Box::new(x), m)),
+//             (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Tan(Box::new(x), m)),
+//             (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Asin(Box::new(x), m)),
+//             (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Acos(Box::new(x), m)),
+//             (inner.clone(), any::<AngleMeasure>()).prop_map(|(x, m)| Expr::Atan(Box::new(x), m)),
+//         ]
+//     })
+// }
 
 fn arb_simpl_expr<N, S, F>(arb_n: F) -> impl Strategy<Value = Expr<N>>
 where
@@ -101,6 +116,10 @@ where
             (inner.clone(), inner.clone())
                 .prop_filter("division by zero", |(x, y)| !(x.is_zero()
                     && y.is_negative()))
+                .prop_filter("complex power", |(x, y)| !(x.is_negative()
+                    && y < &Expr::<N>::one()))
+                .prop_filter("large exponent", |(x, y)| !(x.is_num()
+                    && y.abs() > Expr::<N>::from(64)))
                 .prop_map(|(x, y)| x.pow(y)),
             (inner.clone(), inner.clone()).prop_map(|(x, y)| x.abs().log(y.abs())),
             (inner.clone(), inner.clone())

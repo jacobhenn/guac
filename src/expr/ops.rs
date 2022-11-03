@@ -1,12 +1,18 @@
 use super::Expr;
 use num::{
     traits::{Inv, Pow},
-    BigRational, Num, One, Signed, Zero,
+    BigRational, Num, One, Signed, Zero, BigInt,
 };
 use std::{
     iter::{Product, Sum},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
 };
+
+#[cfg(test)]
+use proptest::prelude::*;
+
+#[cfg(test)]
+use num::integer::Roots;
 
 impl<N> Expr<N> {
     /// Take the logarithm of self in base `base`. Perform obvious simplifications.
@@ -133,10 +139,37 @@ trait NumPow: Sized {
     fn pow(self, rhs: Self) -> Expr<Self>;
 }
 
+fn try_perfect_nth_root(lhs: &BigRational, rhs: &BigInt) -> Option<BigInt> {
+    if !lhs.is_integer() {
+        return None;
+    }
+
+    u32::try_from(rhs).ok().and_then(|rhs| {
+        let lhs_int = lhs.to_integer();
+        let root = lhs_int.nth_root(rhs);
+        (root.clone().pow(rhs) == lhs_int).then_some(root)
+    })
+}
+
+#[cfg(test)]
+proptest! {
+    #[test]
+    fn test_is_rootable_by(
+        m in 2..=8i32,
+        n in 0..=u32::MAX.sqrt().sqrt(),
+    ) {
+        let rm = BigInt::from(m);
+        let rn = BigRational::from(BigInt::from(n));
+        assert!(try_perfect_nth_root(&<BigRational as Pow<_>>::pow(rn, &rm), &rm).is_some());
+    }
+}
+
 impl NumPow for BigRational {
     fn pow(self, rhs: Self) -> Expr<Self> {
         if rhs.is_integer() {
             Expr::Num(<Self as Pow<_>>::pow(self, rhs.numer()))
+        } else if let Some(root) = try_perfect_nth_root(&self, rhs.denom()) {
+            Expr::Num(BigRational::from(root))
         } else {
             Expr::Power(Box::new(Expr::Num(self)), Box::new(Expr::Num(rhs)))
         }
@@ -178,6 +211,10 @@ where
 
     fn pow(mut self, mut rhs: Self) -> Self::Output {
         self.correct();
+        // if self.is_one() {
+        //     return self;
+        // }
+
         rhs.correct();
 
         let mut out = match (self, rhs) {

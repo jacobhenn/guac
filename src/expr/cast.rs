@@ -5,7 +5,7 @@ use crate::{
 
 use super::Expr;
 
-use num::{traits::Pow, BigInt, BigRational, ToPrimitive};
+use num::{traits::Pow, BigInt, BigRational, ToPrimitive, rational::Ratio};
 
 impl From<i32> for Expr<BigRational> {
     fn from(n: i32) -> Self {
@@ -38,7 +38,7 @@ macro_rules! impl_from_i32 {
 }
 
 impl_from_i32! {
-    for i32; for i64; for i128; for f64
+    for i32; for i64; for i128; for f64; for Ratio<i32>
 }
 
 impl Expr<BigRational> {
