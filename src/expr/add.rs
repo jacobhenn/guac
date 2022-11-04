@@ -1,10 +1,12 @@
-use super::Expr;
-use num::{One, Zero, traits::Pow};
+use crate::expr::Expr;
+
 use std::{
     clone::Clone,
     iter::Product,
     ops::{Add, AddAssign},
 };
+
+use num::{One, Zero, traits::Pow};
 
 impl<N> Expr<N> {
     /// Convert this expression into a list of its terms. e.g., turns `2+x+y` into `[2, x, y]`

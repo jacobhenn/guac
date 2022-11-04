@@ -3,16 +3,19 @@ use crate::{
     radix::{self, Radix},
     SoftError, State,
 };
+
+use std::fmt::Display;
+
 use anyhow::{Context, Result};
+
 use colored::Colorize;
+
 use crossterm::{
     cursor,
     event::{KeyCode::*, KeyEvent},
     terminal::{self, ClearType},
     ExecutableCommand, QueueableCommand,
 };
-
-use std::fmt::Display;
 
 mod normal;
 

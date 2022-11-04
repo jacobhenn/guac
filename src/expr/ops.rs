@@ -1,11 +1,13 @@
-use super::Expr;
-use num::{
-    traits::{Inv, Pow},
-    BigRational, Num, One, Signed, Zero, BigInt,
-};
+use crate::expr::Expr;
+
 use std::{
     iter::{Product, Sum},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
+};
+
+use num::{
+    traits::{Inv, Pow},
+    BigRational, Num, One, Signed, Zero, BigInt,
 };
 
 #[cfg(test)]

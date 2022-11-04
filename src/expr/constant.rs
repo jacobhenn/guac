@@ -1,5 +1,5 @@
 use std::{
-    f64::consts,
+    f64,
     fmt::{self, Display, Formatter},
 };
 
@@ -75,14 +75,14 @@ impl Display for Const {
 impl From<Const> for f64 {
     fn from(c: Const) -> Self {
         match c {
-            Const::Pi => consts::PI,
-            Const::Tau => consts::TAU,
-            Const::E => consts::E,
+            Const::Pi => f64::consts::PI,
+            Const::Tau => f64::consts::TAU,
+            Const::E => f64::consts::E,
             Const::Gamma => 0.577_215_664_901_532_9_f64,
             Const::Vcs => 9_192_631_770_f64,
             Const::C => 299_792_458_f64,
             Const::H => 6.626_070_15e-34,
-            Const::Hbar => 6.626_070_15e-34 / consts::TAU,
+            Const::Hbar => 6.626_070_15e-34 / f64::consts::TAU,
             Const::Qe => 1.602_176_634e-19,
             Const::K => 1.380_649e-23,
             Const::G => 6.674_301_5e-11,

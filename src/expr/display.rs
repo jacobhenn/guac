@@ -1,13 +1,12 @@
-use std::{iter::Product, ops::Neg};
-
-use num::{traits::Inv, BigRational, One, Signed, Zero};
-
 use crate::{
     config::Config,
+    expr::Expr,
     radix::{DisplayWithContext, Radix},
 };
 
-use super::Expr;
+use std::{iter::Product, ops::Neg};
+
+use num::{traits::Inv, BigRational, One, Signed, Zero};
 
 /// **Input must be a number which has been correctly `to_string`ed.** Returns the input in e-notation. Since it takes a pre-formatted string, this works regardless of base.
 // pub fn make_e_notation(mut s: String) -> String {

@@ -1,9 +1,8 @@
 use crate::{
     config::{AngleMeasure, Config},
     radix::Radix,
+    expr::Expr,
 };
-
-use super::Expr;
 
 use num::{traits::Pow, BigInt, BigRational, ToPrimitive, rational::Ratio};
 

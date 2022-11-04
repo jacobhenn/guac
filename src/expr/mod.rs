@@ -1,8 +1,7 @@
+use crate::{config::AngleMeasure, expr::constant::Const};
+
 use std::iter::Product;
 
-use crate::config::AngleMeasure;
-
-use self::constant::Const;
 use num::{One, Zero};
 
 /// Implementation of `Add` for `Expr`, along with helper types and functions for that purpose.

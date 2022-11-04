@@ -1,3 +1,5 @@
+use crate::{config::Config, expr::Expr};
+
 use std::{
     fmt::Display,
     ops::{Deref, Neg},
@@ -5,8 +7,6 @@ use std::{
 };
 
 use num::{bigint::Sign, BigInt, BigRational, One, Signed};
-
-use crate::{config::Config, expr::Expr};
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;

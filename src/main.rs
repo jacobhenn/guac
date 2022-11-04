@@ -11,6 +11,35 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::must_use_candidate)]
 
+use crate::{
+    args::{Args, SubCommand},
+    config::Config,
+    expr::Expr,
+    mode::{Mode, Status},
+    radix::Radix,
+};
+
+use std::{
+    fmt::Display,
+    io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write},
+    mem,
+    process::exit,
+};
+
+use anyhow::{bail, Context, Error};
+
+use colored::Colorize;
+
+use crossterm::{
+    cursor,
+    event::{self, Event},
+    terminal::{self, ClearType},
+    tty::IsTty,
+    ExecutableCommand, QueueableCommand,
+};
+
+use num::{traits::Pow, BigRational};
+
 /// Provides the `Expr` type and various methods for working with it
 pub mod expr;
 
@@ -30,29 +59,6 @@ mod args;
 
 #[cfg(test)]
 mod tests;
-
-use crate::args::Args;
-use crate::expr::Expr;
-use crate::radix::Radix;
-use anyhow::{bail, Context, Error};
-use args::SubCommand;
-use colored::Colorize;
-use config::Config;
-use crossterm::{
-    cursor,
-    event::{self, Event},
-    terminal::{self, ClearType},
-    tty::IsTty,
-    ExecutableCommand, QueueableCommand,
-};
-use mode::{Mode, Status};
-use num::{traits::Pow, BigRational};
-use std::{
-    fmt::Display,
-    io::{self, stdin, stdout, BufRead, BufReader, ErrorKind, StdoutLock, Write},
-    mem,
-    process::exit,
-};
 
 /// A representation of an error on the user's end.
 pub enum SoftError {

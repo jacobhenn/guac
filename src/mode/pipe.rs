@@ -1,13 +1,14 @@
-use crate::{SoftError, State};
-use anyhow::{Context, Result};
-use crossterm::event::{KeyCode, KeyEvent};
+use crate::{mode::Mode, SoftError, State, Status};
+
 use std::{
     io::{BufRead, BufReader, Write},
     mem,
     process::{self, Stdio},
 };
 
-use super::{Mode, Status};
+use anyhow::{Context, Result};
+
+use crossterm::event::{KeyCode, KeyEvent};
 
 impl<'a> State<'a> {
     /// Execute the command entered in pipe mode.

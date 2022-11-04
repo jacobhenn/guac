@@ -1,14 +1,17 @@
-use super::{Mode, Status};
 use crate::{
     expr::{constant::Const, Expr},
+    mode::{Mode, Status},
     SoftError, State,
 };
+
+use std::ops::Neg;
+
 use crossterm::event::{KeyCode, KeyEvent};
+
 use num::{
     traits::{Inv, Pow},
     One, Signed, Zero,
 };
-use std::ops::Neg;
 
 impl<'a> State<'a> {
     /// Process a keypress in normal mode.

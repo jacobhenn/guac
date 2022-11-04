@@ -1,9 +1,11 @@
-use super::Expr;
-use num::{traits::Pow, One, Zero};
+use crate::expr::Expr;
+
 use std::{
     iter::Product,
     ops::{Add, AddAssign, Mul, MulAssign},
 };
+
+use num::{traits::Pow, One, Zero};
 
 impl<N> Expr<N> {
     /// (Trivially) convert this expression into a list of its factors. **Does not actively factor expressions**. e.g., turns `2*x^2` into `[2, x^2]`, but turns `(2x+2)` into `[2x+2]`

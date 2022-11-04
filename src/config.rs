@@ -2,14 +2,14 @@
 // see https://github.com/rust-lang/rust-clippy/issues/9786
 #![allow(clippy::use_self)]
 
-use std::{str::FromStr, ops::Mul};
-
-use derive_more::Display;
-
 use crate::{
     expr::{constant::Const, Expr},
     radix::Radix,
 };
+
+use std::{str::FromStr, ops::Mul};
+
+use derive_more::Display;
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;

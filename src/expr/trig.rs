@@ -1,13 +1,11 @@
+use crate::{config::AngleMeasure, expr::Expr};
+
 use std::ops::{Div, Mul, Neg};
 
 use num::{
     traits::{Inv, Pow},
     One, Signed, Zero,
 };
-
-use crate::config::AngleMeasure;
-
-use super::Expr;
 
 impl<N> Expr<N> {
     /// Interpret the given expression as an angle in `measure`, and convert it to an angle in turns.

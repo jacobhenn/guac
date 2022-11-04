@@ -1,8 +1,6 @@
+use crate::{State, mode::Status};
+
 use crossterm::event::{KeyCode, KeyEvent};
-
-use crate::State;
-
-use super::Status;
 
 impl<'a> State<'a> {
     /// The mode in which the user can enter a `guac` command, such as `set`.
