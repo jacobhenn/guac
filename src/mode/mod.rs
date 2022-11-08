@@ -1,7 +1,7 @@
 use crate::{
     expr::{constant::Const, Expr},
     radix::{self, Radix},
-    SoftError, State,
+    error::SoftError, State,
 };
 
 use std::fmt::Display;

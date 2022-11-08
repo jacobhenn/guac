@@ -2,7 +2,7 @@ use crate::{
     apply_binary, apply_binary_always, apply_unary, apply_unary_always,
     expr::{constant::Const, Expr},
     mode::{Mode, Status},
-    SoftError, State,
+    error::SoftError, State,
 };
 
 use std::ops::Neg;
@@ -171,7 +171,7 @@ impl<'a> State<'a> {
                 unimplemented!("`]` is a debug key which is currently not being used");
             }
             KeyCode::Char('x') => {
-                self.push_exact_expr(Expr::Var("x".to_string()), self.config.radix);
+                self.push_exact_expr(Expr::Var("x".to_string()), self.config.radix)
             }
             KeyCode::Char('k') => self.mode = Mode::Constant,
             KeyCode::Char('v') => {
@@ -208,10 +208,11 @@ impl<'a> State<'a> {
                         self.stack.swap(*i, *i - 1);
                         *i -= 1;
                     }
-                } else if self.push_input().is_some() {
-                    self.swap();
-                    self.select_idx = Some(self.stack.len() - 2);
-                }
+                } else
+                    if self.push_input().is_some() {
+                        self.swap();
+                        self.select_idx = Some(self.stack.len() - 2);
+                    }
             }
             KeyCode::Char('>') => {
                 if let Some(i) = &mut self.select_idx {
