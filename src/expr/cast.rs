@@ -150,12 +150,14 @@ impl Expr<BigRational> {
 }
 
 /// Take an angle in `from` and convert it to an angle in `to`.
+#[must_use]
 pub fn convert_angle_f64(x: f64, from: AngleMeasure, to: AngleMeasure) -> f64 {
     (x / from.full_turn_f64()) * to.full_turn_f64()
 }
 
 /// Take a decimal number (like "5.64") and convert it to a rational number in lowest terms (in that case, 141/25).
 // FIXME: this parsing could be way better
+#[must_use]
 pub fn parse_decimal_rational(s: &str) -> Option<BigRational> {
     let sep: Vec<_> = s.split('.').collect();
 

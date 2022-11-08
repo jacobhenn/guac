@@ -77,16 +77,19 @@ impl Radix {
     }
 
     /// Get this radix's Misalian abbreviation from `ABBVS`.
+    #[must_use]
     pub const fn abbv(&self) -> &'static str {
         ABBVS[self.0 - 2]
     }
 
     /// Get this radix's octoctal single-char name from `DIGITS`.
+    #[must_use]
     pub fn char(&self) -> Option<&char> {
         DIGITS.get(self.0)
     }
 
     /// Attempt to parse a digit into an integer in this radix.
+    #[must_use]
     pub fn parse_digit<T>(&self, digit: &char) -> Option<T>
     where
         T: TryFrom<usize>,
@@ -100,11 +103,13 @@ impl Radix {
     }
 
     /// Is `digit` one of the digits which can constitute a valid number in this radix?
+    #[must_use]
     pub fn contains_digit(&self, digit: &char) -> bool {
         DIGITS[0..self.0].iter().any(|c| c == digit)
     }
 
     /// Parse a string into a `BigInt` under this radix.
+    #[must_use]
     pub fn parse_bigint(&self, s: &str) -> Option<BigInt> {
         if s.is_empty() {
             return None;
@@ -126,6 +131,7 @@ impl Radix {
     }
 
     /// Getter for `self.0`. Returns the inner number of this radix.
+    #[must_use]
     pub const fn inner(&self) -> usize {
         self.0
     }
@@ -185,6 +191,7 @@ pub trait DisplayWithContext {
     /// Returns what prefix should be put in front of this number when displaying in the given
     /// context. For example, `prefix(Radix::DECIMAL, config)` will return an empty string if
     /// the current global radix is decimal, and "dec#" if it is not.
+    #[must_use]
     fn prefix(radix: Radix, config: &Config) -> String {
         if config.radix == radix {
             String::new()

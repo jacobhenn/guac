@@ -10,7 +10,6 @@
 #![allow(clippy::enum_glob_use)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_precision_loss)]
-#![allow(clippy::must_use_candidate)]
 
 use crate::{
     args::{Args, SubCommand},
@@ -269,6 +268,7 @@ pub struct StackItem {
 
 impl StackItem {
     /// Create a new `StackItem` containing an exact expression and cache its rendered strings.
+    #[must_use]
     pub fn new_exact(exact_expr: Expr<BigRational>, radix: Radix, config: &Config) -> Self {
         let approx_expr = exact_expr.clone().approx();
         let exact_str = exact_expr.display(radix, config);
@@ -286,6 +286,7 @@ impl StackItem {
     }
 
     /// Create a new `StackItem` containing an approximate expression and cache its rendered string.
+    #[must_use]
     pub fn new_approx(approx_expr: Expr<f64>, radix: Radix, config: &Config) -> Self {
         let approx_str = approx_expr.display(radix, config);
         Self {

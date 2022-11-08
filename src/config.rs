@@ -79,6 +79,7 @@ pub enum AngleMeasure {
 
 impl AngleMeasure {
     /// Return how many of this angle measure make up a full turn.
+    #[must_use]
     pub fn full_turn<N>(self) -> Expr<N>
     where
         Expr<N>: Mul<Output = Expr<N>> + From<i32>,
@@ -101,6 +102,7 @@ impl AngleMeasure {
     }
 
     /// Return how many of this angle measure make up a full turn.
+    #[must_use]
     pub const fn full_turn_f64(self) -> f64 {
         match self {
             Self::Radian => std::f64::consts::TAU,
