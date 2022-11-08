@@ -162,22 +162,27 @@ impl<'a> State<'a> {
         Ok(())
     }
 
+    /// Push an exact expression containing the constant `c` to the stack.
+    pub fn push_const(&mut self, c: Const) {
+        self.push_exact_expr(Expr::Const(c), self.config.radix);
+    }
+
     /// Constant mode: push a `Const` to the stack.
     pub fn constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
-            Char('p') => self.push_expr(&Expr::Const(Const::Pi), self.config.radix),
-            Char('e') => self.push_expr(&Expr::Const(Const::E), self.config.radix),
-            Char('c') => self.push_expr(&Expr::Const(Const::C), self.config.radix),
-            Char('g') => self.push_expr(&Expr::Const(Const::Gamma), self.config.radix),
-            Char('h') => self.push_expr(&Expr::Const(Const::H), self.config.radix),
-            Char('k') => self.push_expr(&Expr::Const(Const::K), self.config.radix),
+            Char('p') => self.push_const(Const::Pi),
+            Char('e') => self.push_const(Const::E),
+            Char('c') => self.push_const(Const::C),
+            Char('g') => self.push_const(Const::Gamma),
+            Char('h') => self.push_const(Const::H),
+            Char('k') => self.push_const(Const::K),
             Char('m') => {
                 self.mode = Mode::MassConstant;
                 return Status::Render;
             }
-            Char('H') => self.push_expr(&Expr::Const(Const::Hbar), self.config.radix),
-            Char('G') => self.push_expr(&Expr::Const(Const::G), self.config.radix),
-            Char('E') => self.push_expr(&Expr::Const(Const::Qe), self.config.radix),
+            Char('H') => self.push_const(Const::Hbar),
+            Char('G') => self.push_const(Const::G),
+            Char('E') => self.push_const(Const::Qe),
             _ => (),
         }
 
@@ -189,8 +194,8 @@ impl<'a> State<'a> {
     /// Mass constant mode: sub-mode of constant mode for physical constants which represent the mass of certain particles.
     pub fn mass_constant_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
         match code {
-            Char('e') => self.push_expr(&Expr::Const(Const::Me), self.config.radix),
-            Char('p') => self.push_expr(&Expr::Const(Const::Mp), self.config.radix),
+            Char('e') => self.push_const(Const::Me),
+            Char('p') => self.push_const(Const::Mp),
             _ => (),
         }
 
@@ -268,5 +273,37 @@ impl<'a> State<'a> {
         }
 
         Status::Render
+    }
+}
+
+/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
+#[macro_export]
+macro_rules! apply_binary {
+    ( $state:expr, $f:expr, $domain:expr ) => {
+        $state.apply_binary($f, $f, $domain, $domain)
+    }
+}
+
+/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
+#[macro_export]
+macro_rules! apply_binary_always {
+    ( $state:expr, $f:expr ) => {
+        $state.apply_binary($f, $f, |_, _| None, |_, _| None)
+    }
+}
+
+/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
+#[macro_export]
+macro_rules! apply_unary {
+    ( $state:expr, $f:expr, $domain:expr ) => {
+        $state.apply_unary($f, $f, $domain, $domain)
+    }
+}
+
+/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
+#[macro_export]
+macro_rules! apply_unary_always {
+    ( $state:expr, $f:expr ) => {
+        $state.apply_unary($f, $f, |_| None, |_| None)
     }
 }

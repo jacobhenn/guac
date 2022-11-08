@@ -145,6 +145,12 @@ impl From<Radix> for Expr<BigRational> {
     }
 }
 
+impl From<Radix> for Expr<f64> {
+    fn from(Radix(n): Radix) -> Self {
+        Self::Num(n as f64)
+    }
+}
+
 impl FromStr for Radix {
     type Err = ();
 

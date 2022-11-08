@@ -8,3 +8,4 @@ cc ec933c3e0aa99956b2b18685c215ab9e5edd7b866d9d072ed00d47d148ab6d51 # shrinks to
 cc 61858166170b32f05a94ce8a58c4421136c8dbea2025a6d3feb7917c2c024298 # shrinks to expr = Power(Num(Ratio { numer: 1, denom: 1 }), Num(Ratio { numer: 1, denom: 4294967296 })) # that's 2^32
 cc 2c9c8a1ab89c64595d20f642cc2129e5f790e0bc67dd3f93dc5ced9f07898054 # shrinks to expr = Num(Ratio { numer: 0, denom: 1 })
 cc e9a8a9beb42c47cef7b62e2176f3c767b0e087dbda4588fc265a200222335233 # shrinks to x = Const(Pi), y = Sum([Var("a"), Const(Pi)])
+cc fc84a3ea1edaec809c17f2828397c865e78faf4a44ea212482118fb8292bb6d1 # shrinks to expr = Power(Num(Ratio { numer: 1, denom: 1 }), Num(Ratio { numer: 1, denom: 4294967297 }))

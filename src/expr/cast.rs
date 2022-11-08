@@ -18,6 +18,12 @@ impl From<(i32, i32)> for Expr<BigRational> {
     }
 }
 
+impl From<BigInt> for Expr<BigRational> {
+    fn from(n: BigInt) -> Self {
+        Self::Num(BigRational::from(n))
+    }
+}
+
 impl From<(i32, i32)> for Expr<f64> {
     fn from((n, m): (i32, i32)) -> Self {
         Self::Num(f64::from(n) / f64::from(m))
