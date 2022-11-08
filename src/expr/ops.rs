@@ -213,10 +213,6 @@ where
 
     fn pow(mut self, mut rhs: Self) -> Self::Output {
         self.correct();
-        // if self.is_one() {
-        //     return self;
-        // }
-
         rhs.correct();
 
         let mut out = match (self, rhs) {

@@ -202,8 +202,8 @@ impl<N> Expr<N> {
                 e.correct();
                 if e.is_one() {
                     *self = *b.clone();
-                } else if e.is_zero() {
-                    *self = One::one();
+                } else if e.is_zero() || b.is_one() {
+                    *self = Self::one();
                 }
             }
             _ => (),
