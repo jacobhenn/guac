@@ -1,6 +1,7 @@
 use std::{io, fmt::Display};
 
 /// A representation of an error on the user's end.
+#[allow(clippy::module_name_repetitions)]
 pub enum SoftError {
     /// Operation would divided by zero.
     DivideByZero,

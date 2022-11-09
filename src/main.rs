@@ -14,10 +14,10 @@
 use crate::{
     args::{Args, SubCommand},
     config::Config,
+    error::SoftError,
     expr::Expr,
     mode::{Mode, Status},
     radix::Radix,
-    error::SoftError,
 };
 
 use std::{
@@ -118,9 +118,7 @@ pub enum StackVal {
 impl StackVal {
     const fn approx_expr(&self) -> &Expr<f64> {
         match self {
-            Self::Exact { approx_expr, .. } | Self::Approx { approx_expr, .. } => {
-                approx_expr
-            }
+            Self::Exact { approx_expr, .. } | Self::Approx { approx_expr, .. } => approx_expr,
         }
     }
 
@@ -128,9 +126,7 @@ impl StackVal {
     #[allow(clippy::missing_const_for_fn)]
     fn into_approx_expr(self) -> Expr<f64> {
         match self {
-            Self::Exact { approx_expr, .. } | Self::Approx { approx_expr, .. } => {
-                approx_expr
-            }
+            Self::Exact { approx_expr, .. } | Self::Approx { approx_expr, .. } => approx_expr,
         }
     }
 
@@ -490,60 +486,52 @@ impl<'a> State<'a> {
         }
     }
 
-    fn push_input(&mut self) -> Option<String> {
+    fn push_input(&mut self) -> Result<Option<String>, SoftError> {
         if self.input.is_empty() {
-            if self.input_radix.is_none() {
-                return None;
-            } else if let Some(i) = self.selected_or_last_idx() {
-                if let Some(x) = self.stack.get_mut(i) {
-                    x.radix = self.input_radix.unwrap_or(self.config.radix);
-                    x.rerender(&self.config);
+            // pressing `enter` when the input looks like `hex#` should alter the radix of the top
+            // or selected stack item
+            if self.input_radix.is_some() {
+                if let Some(i) = self.selected_or_last_idx() {
+                    if let Some(x) = self.stack.get_mut(i) {
+                        x.radix = self.input_radix.unwrap_or(self.config.radix);
+                        x.rerender(&self.config);
+                    }
+
+                    self.input_radix = None;
+                    self.radix_input = None;
+                    self.reset_mode();
                 }
-
-                self.input_radix = None;
-                self.radix_input = None;
-                self.reset_mode();
-
-                return None;
             }
+
+            return Ok(None);
         }
 
         let radix = self.input_radix.unwrap_or(self.config.radix);
 
-        // FIXME: wtf
-        let eex = match self.eex_input.as_ref().map(|eex_input| {
-            radix.parse_bigint(eex_input)
-        }) {
-            Some(None) => {
-                self.err = Some(SoftError::BadEex);
-                return None;
-            }
-            Some(other) => other,
-            None => None,
-        };
+        let eex = self
+            .eex_input
+            .as_ref()
+            .map(|eex_input| radix.parse_bigint(eex_input).ok_or(SoftError::BadRadix))
+            .transpose()?;
 
-        match self.parse_expr(&self.input) {
-            Ok(StackExpr::Approx(mut expr)) => {
+        match self.parse_expr(&self.input)? {
+            StackExpr::Approx(mut expr) => {
                 if let Some(eex) = eex {
                     if let Ok(eex) = i128::try_from(eex).map(|n| n as f64) {
                         expr *= Expr::from(radix).pow(Expr::Num(eex));
                     } else {
-                        self.err = Some(SoftError::BigEex);
+                        return Err(SoftError::BigEex);
                     }
                 }
 
                 self.push_approx_expr(expr, radix);
             }
-            Ok(StackExpr::Exact(mut expr)) => {
+            StackExpr::Exact(mut expr) => {
                 if let Some(eex) = eex {
                     expr *= Expr::from(radix).pow(Expr::from(eex));
                 }
 
                 self.push_exact_expr(expr, radix);
-            }
-            Err(e) => {
-                self.err = Some(e);
-                return None;
             }
         };
 
@@ -553,7 +541,7 @@ impl<'a> State<'a> {
         self.input_radix = None;
         self.reset_mode();
 
-        Some(prev_input)
+        Ok(Some(prev_input))
     }
 
     fn push_var(&mut self) {
@@ -570,20 +558,21 @@ impl<'a> State<'a> {
         approx_f: ApproxF,
         are_in_domain_exact: ExactDomain,
         are_in_domain_approx: ApproxDomain,
-    ) where
+    ) -> Result<(), SoftError>
+    where
         ExactF: Fn(Expr<BigRational>, Expr<BigRational>) -> Expr<BigRational>,
         ApproxF: Fn(Expr<f64>, Expr<f64>) -> Expr<f64>,
         ExactDomain: Fn(&Expr<BigRational>, &Expr<BigRational>) -> Option<SoftError>,
         ApproxDomain: Fn(&Expr<f64>, &Expr<f64>) -> Option<SoftError>,
     {
         let prev_input = if self.select_idx.is_none() {
-            self.push_input()
+            self.push_input()?
         } else {
             None
         };
 
         if self.stack.len() < 2 || self.select_idx == Some(0) {
-            return;
+            return Ok(());
         }
 
         let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
@@ -594,13 +583,12 @@ impl<'a> State<'a> {
             are_in_domain_exact,
             are_in_domain_approx,
         ) {
-            self.err = Some(e);
-
             if let Some(prev_input) = prev_input {
+                self.stack.pop();
                 self.input = prev_input;
             }
 
-            return;
+            return Err(e);
         }
 
         let x = self.stack.remove(idx - 1);
@@ -608,6 +596,7 @@ impl<'a> State<'a> {
 
         let radix = x.radix;
 
+        // TODO: (when let-chains come out) you know what you did
         let item = if let (
             StackVal::Exact {
                 exact_expr: lhs_exact_expr,
@@ -618,7 +607,6 @@ impl<'a> State<'a> {
                 ..
             },
         ) = (x.val.clone(), y.val.clone())
-        // TODO: ugh fix this when let-chains come out
         {
             StackItem::new_exact(exact_f(lhs_exact_expr, rhs_exact_expr), radix, &self.config)
         } else {
@@ -634,6 +622,8 @@ impl<'a> State<'a> {
         if let Some(i) = self.select_idx.as_mut() {
             *i -= 1;
         }
+
+        Ok(())
     }
 
     fn apply_unary<ExactF, ApproxF, ExactDomain, ApproxDomain>(
@@ -642,20 +632,21 @@ impl<'a> State<'a> {
         approx_f: ApproxF,
         is_in_domain_exact: ExactDomain,
         is_in_domain_approx: ApproxDomain,
-    ) where
+    ) -> Result<(), SoftError>
+    where
         ExactF: Fn(Expr<BigRational>) -> Expr<BigRational>,
         ApproxF: Fn(Expr<f64>) -> Expr<f64>,
         ExactDomain: Fn(&Expr<BigRational>) -> Option<SoftError>,
         ApproxDomain: Fn(&Expr<f64>) -> Option<SoftError>,
     {
         let prev_input = if self.select_idx.is_none() {
-            self.push_input()
+            self.push_input()?
         } else {
             None
         };
 
         if self.stack.is_empty() {
-            return;
+            return Ok(());
         }
 
         let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
@@ -664,13 +655,12 @@ impl<'a> State<'a> {
             .val
             .apply_unary(is_in_domain_exact, is_in_domain_approx)
         {
-            self.err = Some(e);
-
             if let Some(prev_input) = prev_input {
+                self.stack.pop();
                 self.input = prev_input;
             }
 
-            return;
+            return Err(e);
         }
 
         let x = self.stack.remove(idx);
@@ -685,6 +675,8 @@ impl<'a> State<'a> {
         };
 
         self.stack.insert(idx, item);
+
+        Ok(())
     }
 
     fn dup(&mut self) {
@@ -760,7 +752,7 @@ impl<'a> State<'a> {
             // Read the next event from the terminal.
             if let Event::Key(kev) = event::read().context("couldn't get next terminal event")? {
                 match self.handle_keypress(kev) {
-                    Status::Render => {
+                    Ok(Status::Render) => {
                         self.write_modeline().context("couldn't write modeline")?;
                         self.render().context("couldn't render the state")?;
                         if let Some(old_stack) = self.history.last() {
@@ -773,10 +765,10 @@ impl<'a> State<'a> {
                             self.history.push(self.stack.clone());
                         }
                     }
-                    Status::Exit => {
+                    Ok(Status::Exit) => {
                         break;
                     }
-                    Status::Undo => {
+                    Ok(Status::Undo) => {
                         if self.future.is_empty() {
                             self.history.pop();
                         }
@@ -788,7 +780,7 @@ impl<'a> State<'a> {
 
                         self.render().context("couldn't render the state")?;
                     }
-                    Status::Redo => {
+                    Ok(Status::Redo) => {
                         if let Some(mut new_stack) = self.future.pop() {
                             mem::swap(&mut new_stack, &mut self.stack);
                             self.history.push(new_stack);
@@ -796,7 +788,13 @@ impl<'a> State<'a> {
                         self.render().context("couldn't render the state")?;
                     }
                     #[cfg(debug_assertions)]
-                    Status::Debug => bail!("debug"),
+                    Ok(Status::Debug) => bail!("debug"),
+                    Err(e) => {
+                        self.err = Some(e);
+                        // TODO: decide if we really need to render the whole stack here
+                        self.write_modeline().context("couldn't write modeline")?;
+                        self.render().context("couldn't render the state")?;
+                    },
                 }
             }
         }

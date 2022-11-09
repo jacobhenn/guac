@@ -98,13 +98,13 @@ impl<'a> State<'a> {
     }
 
     /// Handle a key event by matching on the current mode.
-    pub fn handle_keypress(&mut self, kev: KeyEvent) -> Status {
+    pub fn handle_keypress(&mut self, kev: KeyEvent) -> Result<Status, SoftError> {
         match self.mode {
             Mode::Normal => self.normal_mode(kev, false),
             Mode::Insert => self.normal_mode(kev, true),
-            Mode::Constant => self.constant_mode(kev),
-            Mode::MassConstant => self.mass_constant_mode(kev),
-            Mode::Variable => self.variable_mode(kev),
+            Mode::Constant => Ok(self.constant_mode(kev)),
+            Mode::MassConstant => Ok(self.mass_constant_mode(kev)),
+            Mode::Variable => Ok(self.variable_mode(kev)),
             Mode::Pipe => self.pipe_mode(kev),
             Mode::Radix => self.radix_mode(kev),
             Mode::Cmd => self.cmd_mode(kev),
@@ -228,7 +228,7 @@ impl<'a> State<'a> {
     }
 
     /// Radix mode: allows the user to type in a radix in which to input a number
-    pub fn radix_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
+    pub fn radix_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<Status, SoftError> {
         match code {
             Enter | Char(' ' | '#') => {
                 if let Ok(radix) = self
@@ -249,7 +249,7 @@ impl<'a> State<'a> {
                     self.input_radix = None;
                     self.mode = Mode::Normal;
                 } else {
-                    self.err = Some(SoftError::BadRadix);
+                    return Err(SoftError::BadRadix);
                 }
             }
             Char(c) if radix::DIGITS.contains(&c) => {
@@ -272,7 +272,7 @@ impl<'a> State<'a> {
             _ => (),
         }
 
-        Status::Render
+        Ok(Status::Render)
     }
 }
 
@@ -280,7 +280,7 @@ impl<'a> State<'a> {
 #[macro_export]
 macro_rules! apply_binary {
     ( $state:expr, $f:expr, $domain:expr ) => {
-        $state.apply_binary($f, $f, $domain, $domain)
+        $state.apply_binary($f, $f, $domain, $domain)?
     }
 }
 
@@ -288,7 +288,7 @@ macro_rules! apply_binary {
 #[macro_export]
 macro_rules! apply_binary_always {
     ( $state:expr, $f:expr ) => {
-        $state.apply_binary($f, $f, |_, _| None, |_, _| None)
+        $state.apply_binary($f, $f, |_, _| None, |_, _| None)?
     }
 }
 
@@ -296,7 +296,7 @@ macro_rules! apply_binary_always {
 #[macro_export]
 macro_rules! apply_unary {
     ( $state:expr, $f:expr, $domain:expr ) => {
-        $state.apply_unary($f, $f, $domain, $domain)
+        $state.apply_unary($f, $f, $domain, $domain)?
     }
 }
 
@@ -304,6 +304,6 @@ macro_rules! apply_unary {
 #[macro_export]
 macro_rules! apply_unary_always {
     ( $state:expr, $f:expr ) => {
-        $state.apply_unary($f, $f, |_| None, |_| None)
+        $state.apply_unary($f, $f, |_| None, |_| None)?
     }
 }

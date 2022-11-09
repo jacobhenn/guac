@@ -2,7 +2,7 @@ use crate::{SoftError, State};
 
 impl<'a> State<'a> {
     /// Process the words after "set" and modify the state.
-    pub fn set_cmd<I>(&mut self, words: &mut I)
+    pub fn set_cmd<I>(&mut self, words: &mut I) -> Result<(), SoftError>
     where
         I: Iterator<Item = String>,
     {
@@ -12,10 +12,10 @@ impl<'a> State<'a> {
                     if let Ok(angle_measure) = arg.parse() {
                         self.config.angle_measure = angle_measure;
                     } else {
-                        self.err = Some(SoftError::BadSetVal(arg));
+                        return Err(SoftError::BadSetVal(arg));
                     }
                 } else {
-                    self.err = Some(SoftError::GuacCmdMissingArg);
+                    return Err(SoftError::GuacCmdMissingArg);
                 }
             }
             Some(p) if &p == "radix" => {
@@ -26,33 +26,35 @@ impl<'a> State<'a> {
                             stack_item.rerender(&self.config);
                         }
                     } else {
-                        self.err = Some(SoftError::BadSetVal(arg));
+                        return Err(SoftError::BadSetVal(arg));
                     }
                 }
             }
             Some(p) => {
-                self.err = Some(SoftError::BadSetPath(p));
+                return Err(SoftError::BadSetPath(p));
             }
             None => {
-                self.err = Some(SoftError::GuacCmdMissingArg);
+                return Err(SoftError::GuacCmdMissingArg);
             }
         }
+
+        Ok(())
     }
 
     /// Execute the command currently in `self.input`.
-    pub fn exec_cmd(&mut self) {
+    pub fn exec_cmd(&mut self) -> Result<(), SoftError> {
         let cmd = self.input.clone();
         let mut words = cmd.split_whitespace().map(ToString::to_string);
         match words.next().as_deref() {
-            Some("set") => self.set_cmd(&mut words),
+            Some("set") => self.set_cmd(&mut words)?,
             Some(c) => {
-                self.err = Some(SoftError::UnknownGuacCmd(c.to_string()));
+                return Err(SoftError::UnknownGuacCmd(c.to_string()));
             }
             None => (),
         }
 
-        if self.err.is_none() {
-            self.input.clear();
-        }
+        self.input.clear();
+
+        Ok(())
     }
 }

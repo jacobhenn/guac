@@ -1,10 +1,10 @@
-use crate::{State, mode::Status};
+use crate::{State, mode::Status, error::SoftError};
 
 use crossterm::event::{KeyCode, KeyEvent};
 
 impl<'a> State<'a> {
     /// The mode in which the user can enter a `guac` command, such as `set`.
-    pub fn cmd_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Status {
+    pub fn cmd_mode(&mut self, KeyEvent { code, .. }: KeyEvent) -> Result<Status, SoftError> {
         match code {
             KeyCode::Char(n) => {
                 self.input.push(n);
@@ -17,7 +17,7 @@ impl<'a> State<'a> {
                 }
             }
             KeyCode::Enter => {
-                self.exec_cmd();
+                self.exec_cmd()?;
                 self.reset_mode();
             }
             KeyCode::Esc => {
@@ -27,6 +27,6 @@ impl<'a> State<'a> {
             _ => (),
         }
 
-        Status::Render
+        Ok(Status::Render)
     }
 }

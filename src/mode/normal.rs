@@ -1,8 +1,9 @@
 use crate::{
     apply_binary, apply_binary_always, apply_unary, apply_unary_always,
+    error::SoftError,
     expr::{constant::Const, Expr},
     mode::{Mode, Status},
-    error::SoftError, State,
+    State,
 };
 
 use std::ops::Neg;
@@ -16,7 +17,11 @@ use num::{
 
 impl<'a> State<'a> {
     /// Process a keypress in normal mode.
-    pub fn normal_mode(&mut self, KeyEvent { code, .. }: KeyEvent, escape_digits: bool) -> Status {
+    pub fn normal_mode(
+        &mut self,
+        KeyEvent { code, .. }: KeyEvent,
+        escape_digits: bool,
+    ) -> Result<Status, SoftError> {
         let radix = self.input_radix.unwrap_or(self.config.radix);
 
         match code {
@@ -36,17 +41,17 @@ impl<'a> State<'a> {
             {
                 self.eex_input.get_or_insert(String::new()).push(c);
             }
-            KeyCode::Char('q') => return Status::Exit,
+            KeyCode::Char('q') => return Ok(Status::Exit),
             KeyCode::Esc => {
                 if escape_digits {
                     self.mode = Mode::Normal;
                 } else {
-                    return Status::Exit;
+                    return Ok(Status::Exit);
                 }
             }
             KeyCode::Char(';') => self.toggle_approx(),
             KeyCode::Enter | KeyCode::Char(' ') => {
-                self.push_input();
+                self.push_input()?;
             }
             KeyCode::Tab => {
                 self.dup();
@@ -171,7 +176,7 @@ impl<'a> State<'a> {
                 unimplemented!("`]` is a debug key which is currently not being used");
             }
             KeyCode::Char('x') => {
-                self.push_exact_expr(Expr::Var("x".to_string()), self.config.radix)
+                self.push_exact_expr(Expr::Var("x".to_string()), self.config.radix);
             }
             KeyCode::Char('k') => self.mode = Mode::Constant,
             KeyCode::Char('v') => {
@@ -181,7 +186,7 @@ impl<'a> State<'a> {
                 self.mode = Mode::Variable;
             }
             KeyCode::Char('|') => {
-                self.push_input();
+                self.push_input()?;
                 if !self.stack.is_empty() {
                     self.err = None;
                     self.input.clear();
@@ -189,7 +194,7 @@ impl<'a> State<'a> {
                 }
             }
             KeyCode::Char(':') => {
-                self.push_input();
+                self.push_input()?;
                 self.err = None;
                 self.input.clear();
                 self.mode = Mode::Cmd;
@@ -200,19 +205,18 @@ impl<'a> State<'a> {
                 self.radix_input.get_or_insert(String::new());
                 self.mode = Mode::Radix;
             }
-            KeyCode::Char('u') => return Status::Undo,
-            KeyCode::Char('U') => return Status::Redo,
+            KeyCode::Char('u') => return Ok(Status::Undo),
+            KeyCode::Char('U') => return Ok(Status::Redo),
             KeyCode::Char('<') => {
                 if let Some(i) = &mut self.select_idx {
                     if *i != 0 {
                         self.stack.swap(*i, *i - 1);
                         *i -= 1;
                     }
-                } else
-                    if self.push_input().is_some() {
-                        self.swap();
-                        self.select_idx = Some(self.stack.len() - 2);
-                    }
+                } else if self.push_input()?.is_some() {
+                    self.swap();
+                    self.select_idx = Some(self.stack.len() - 2);
+                }
             }
             KeyCode::Char('>') => {
                 if let Some(i) = &mut self.select_idx {
@@ -245,6 +249,6 @@ impl<'a> State<'a> {
             _ => (),
         }
 
-        Status::Render
+        Ok(Status::Render)
     }
 }
