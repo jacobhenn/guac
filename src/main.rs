@@ -757,11 +757,11 @@ impl<'a> State<'a> {
                         self.render().context("couldn't render the state")?;
                         if let Some(old_stack) = self.history.last() {
                             if &self.stack != old_stack {
-                                self.future.clear();
+                                self.future = Vec::new();
                                 self.history.push(self.stack.clone());
                             }
                         } else {
-                            self.future.clear();
+                            self.future = String::new();
                             self.history.push(self.stack.clone());
                         }
                     }

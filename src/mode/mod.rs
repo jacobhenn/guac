@@ -218,7 +218,7 @@ impl<'a> State<'a> {
                 self.input.pop();
             }
             Esc => {
-                self.input.clear();
+                self.input = String::new();
                 self.mode = Mode::Normal;
             }
             _ => (),

@@ -180,7 +180,7 @@ impl<'a> State<'a> {
             }
             KeyCode::Char('k') => self.mode = Mode::Constant,
             KeyCode::Char('v') => {
-                self.input.clear();
+                self.input = String::new();
                 self.eex_input = None;
                 self.select_idx = None;
                 self.mode = Mode::Variable;
@@ -189,14 +189,14 @@ impl<'a> State<'a> {
                 self.push_input()?;
                 if !self.stack.is_empty() {
                     self.err = None;
-                    self.input.clear();
+                    self.input = String::new();
                     self.mode = Mode::Pipe;
                 }
             }
             KeyCode::Char(':') => {
                 self.push_input()?;
                 self.err = None;
-                self.input.clear();
+                self.input = String::new();
                 self.mode = Mode::Cmd;
             }
             KeyCode::Char('i') => self.mode = Mode::Insert,
