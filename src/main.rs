@@ -761,7 +761,7 @@ impl<'a> State<'a> {
                                 self.history.push(self.stack.clone());
                             }
                         } else {
-                            self.future = String::new();
+                            self.future = Vec::new();
                             self.history.push(self.stack.clone());
                         }
                     }
