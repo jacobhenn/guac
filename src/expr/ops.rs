@@ -240,6 +240,7 @@ where
 
 impl<N> Inv for Expr<N>
 where
+    // TODO: change this to make the bounds more reasonable
     Self: Pow<Self, Output = Self> + From<i32>,
 {
     type Output = Self;

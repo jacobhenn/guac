@@ -1,10 +1,6 @@
-use crate::{
-    config::{AngleMeasure, Config},
-    radix::Radix,
-    expr::Expr,
-};
+use crate::{config::AngleMeasure, expr::Expr};
 
-use num::{traits::Pow, BigInt, BigRational, ToPrimitive, rational::Ratio};
+use num::{rational::Ratio, traits::Pow, BigInt, BigRational, ToPrimitive};
 
 impl From<i32> for Expr<BigRational> {
     fn from(n: i32) -> Self {
@@ -60,9 +56,8 @@ impl Expr<BigRational> {
             let rf = f(mf, nf);
             if !rf.is_finite() {
                 unreachable!(
-                    "domain checks failed to detect non-finite result ({rf:?}) in binary operation {}",
-                    g(Expr::Var(String::from("x")), Expr::Var(String::from("y")))
-                        .display(Radix::DECIMAL, &Config::default()),
+                    "domain checks failed to detect non-finite result ({rf:?}) in binary operation {:?}",
+                    g(Expr::Var(String::from("x")), Expr::Var(String::from("y"))),
                 );
             }
 
@@ -84,9 +79,8 @@ impl Expr<BigRational> {
             let rf = f(nf);
             if !rf.is_finite() {
                 unreachable!(
-                    "domain checks failed to detect non-finite result ({rf:?}) in unary operation on {}",
-                    g(Expr::Var(String::from("x")))
-                        .display(Radix::DECIMAL, &Config::default()),
+                    "domain checks failed to detect non-finite result ({rf:?}) in unary operation on {:?}",
+                    g(Expr::Var(String::from("x"))),
                 );
             }
 

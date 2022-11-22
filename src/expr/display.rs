@@ -1,33 +1,345 @@
 use crate::{
-    config::Config,
-    expr::Expr,
+    config::{AngleMeasure, Config},
+    expr::{Const, Expr},
     radix::{DisplayWithContext, Radix},
 };
 
-use std::{iter::Product, ops::Neg};
+use std::{fmt, ops::Neg};
 
-use num::{traits::Inv, BigRational, One, Signed, Zero};
+use num::{traits::Inv, BigRational, One, Signed};
 
-/// **Input must be a number which has been correctly `to_string`ed.** Returns the input in e-notation. Since it takes a pre-formatted string, this works regardless of base.
-// pub fn make_e_notation(mut s: String) -> String {
-//     if s.contains('.') {
-//         let mut ns = s.split('.');
-//         let int = ns.next();
-//         let decimal = ns.next();
-//         todo!()
-//     } else {
-//         let exponent = s.len() - 1;
-//         s.truncate(4);
-//         for _ in 0..(4usize.saturating_sub(s.len())) {
-//             s.push('0');
-//         }
+/// Display `Expr`s in latex notation.
+// pub mod latex;
 
-//         s.insert(1, '.');
-//         format!("{s}ᴇ{exponent}")
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[allow(missing_docs)]
+pub enum Precedence {
+    Zero,
+    Power,
+    Product,
+    Sum,
+    Negative,
+}
+
+/// A buffer with associated context to which expressions can be written. Everything that
+/// implements this should have a field that implements `fmt::Write`.
+pub trait ExprFormatter<N>: Sized
+where
+    N: Signed,
+    Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+{
+    #![allow(missing_docs)]
+
+    /// The type returned in event of a formatting error.
+    type Error: From<fmt::Error>;
+
+    /// Get a mutable reference to the internal buffer.
+    fn get_buf(&mut self) -> &mut dyn fmt::Write;
+
+    /// Format a single number to the buffer.
+    fn fmt_num(&mut self, num: &N) -> Result<(), Self::Error>;
+
+    /// Format a sum of terms to the buffer.
+    fn fmt_sum(&mut self, terms: &[Expr<N>]) -> Result<(), Self::Error> {
+        let mut terms_iter = terms.iter().filter(|t| t.is_positive()).peekable();
+        while let Some(term) = terms_iter.next() {
+            self.fmt_child(Precedence::Sum, term)?;
+            if terms_iter.peek().is_some() {
+                self.get_buf().write_char('+')?;
+            }
+        }
+
+        for term in terms
+            .iter()
+            .filter(|t| t.is_negative())
+            .map(|t| t.clone().neg())
+        {
+            self.get_buf().write_char('-')?;
+            self.fmt_child(Precedence::Sum, &term)?;
+        }
+
+        Ok(())
+    }
+
+    /// Write the separating string that should go in between factors of a product ('·' for the
+    /// [default formatter](DefaultFormatter), "\cdot" for the [latex formatter](LatexFormatter)).
+    fn write_product_separator(&mut self) -> Result<(), Self::Error>;
+
+    /// Format the numerator or denominator of a fraction to the buffer.
+    fn fmt_frac_component(
+        &mut self,
+        factors: impl Iterator<Item = impl Formattable<N, Self>>,
+    ) -> Result<(), Self::Error> {
+        let mut factors = factors.peekable();
+        while let Some(factor) = factors.next() {
+            factor.fmt_to(self)?;
+            if factors.peek().is_some() {
+                self.write_product_separator()?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Format a fraction to the buffer.
+    fn fmt_frac(
+        &mut self,
+        numer: impl Iterator<Item = impl Formattable<N, Self>>,
+        denom: impl Iterator<Item = impl Formattable<N, Self>>,
+    ) -> Result<(), Self::Error>;
+
+    /// Format a product of factors to the buffer as numerator and denominator.
+    fn fmt_product(&mut self, factors: &[Expr<N>]) -> Result<(), Self::Error> {
+        let numer = factors.iter().filter(|f| f.has_pos_exp());
+        let denom = factors
+            .iter()
+            .filter(|f| !f.has_pos_exp())
+            .map(|f| f.clone().inv());
+
+        if factors.iter().all(|f| f.has_pos_exp()) {
+            self.fmt_frac_component(numer)
+        } else {
+            self.fmt_frac(numer, denom)
+        }
+    }
+
+    fn fmt_power(&mut self, base: &Expr<N>, exp: &Expr<N>) -> Result<(), Self::Error>;
+    fn fmt_log(&mut self, base: &Expr<N>, arg: &Expr<N>) -> Result<(), Self::Error>;
+    fn fmt_var(&mut self, var: &str) -> Result<(), Self::Error>;
+    fn fmt_const(&mut self, cnst: Const) -> Result<(), Self::Error>;
+    fn fmt_mod(&mut self, lhs: &Expr<N>, rhs: &Expr<N>) -> Result<(), Self::Error>;
+    fn fmt_sin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
+    fn fmt_cos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
+    fn fmt_tan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
+    fn fmt_asin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
+    fn fmt_acos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
+    fn fmt_atan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
+
+    /// Format the given inner item in parentheses.
+    fn fmt_in_parens(&mut self, inner: impl Formattable<N, Self>) -> Result<(), Self::Error>;
+
+    /// Format the given inner item to the buffer; if its precedence is higher than the given
+    /// precedence of the outer expression, format it in parentheses.
+    fn fmt_child(
+        &mut self,
+        parent_precedence: Precedence,
+        child: &Expr<N>,
+    ) -> Result<(), Self::Error> {
+        if parent_precedence < child.precedence() {
+            self.fmt_in_parens(child)
+        } else {
+            self.fmt(child)
+        }
+    }
+
+    /// Format the given expression to the buffer.
+    fn fmt(&mut self, expr: &Expr<N>) -> Result<(), Self::Error> {
+        match expr {
+            Expr::Num(n) => self.fmt_num(n),
+            Expr::Sum(ts) => self.fmt_sum(ts),
+            Expr::Product(fs) => self.fmt_product(fs),
+            Expr::Power(b, e) => self.fmt_power(b, e),
+            Expr::Log(b, a) => self.fmt_log(b, a),
+            Expr::Var(s) => self.fmt_var(s),
+            Expr::Const(c) => self.fmt_const(*c),
+            Expr::Mod(x, y) => self.fmt_mod(x, y),
+            Expr::Sin(x, m) => self.fmt_sin(x, *m),
+            Expr::Cos(x, m) => self.fmt_cos(x, *m),
+            Expr::Tan(x, m) => self.fmt_tan(x, *m),
+            Expr::Asin(x, m) => self.fmt_asin(x, *m),
+            Expr::Acos(x, m) => self.fmt_acos(x, *m),
+            Expr::Atan(x, m) => self.fmt_atan(x, *m),
+        }
+    }
+}
+
+// TODO: see if there's a better way to do this. it seems like there should be
+/// Something which can be formatted to an `ExprFormatter`.
+pub trait Formattable<N, F>
+where
+    N: Signed,
+    Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+    F: ExprFormatter<N>,
+{
+    /// Format the given value to the given formatter.
+    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error>;
+}
+
+impl<N, F> Formattable<N, F> for Expr<N>
+where
+    N: Signed,
+    Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+    F: ExprFormatter<N>,
+{
+    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+        f.fmt(self)
+    }
+}
+
+impl<N, F> Formattable<N, F> for &Expr<N>
+where
+    N: Signed,
+    Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+    F: ExprFormatter<N>,
+{
+    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+        f.fmt(self)
+    }
+}
+
+// impl<N, F, G> Formattable<N, F> for G
+// where
+//     N: Signed,
+//     F: ExprFormatter<N>,
+//     G: Fn(&mut F) -> Result<(), F::Error>,
+// {
+//     fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+//         self(f)
 //     }
 // }
 
-impl<N> Expr<N> where N: Signed {}
+/// The (formatter)[ExprFormatter] for writing expressions to the stack under normal operation.
+pub struct DefaultFormatter<'a> {
+    config: &'a Config,
+    radix: Radix,
+    buf: &'a mut (dyn fmt::Write + 'a),
+}
+
+impl<'a> DefaultFormatter<'a> {
+    /// Create a new [`DefaultFormatter`] which writes into `buf`.
+    pub fn new(config: &'a Config, radix: Radix, buf: &'a mut (dyn fmt::Write + 'a)) -> Self {
+        Self { config, radix, buf }
+    }
+}
+
+// TODO: put these impl items in proper order
+impl<'a, N> ExprFormatter<N> for DefaultFormatter<'a>
+where
+    N: Signed + DisplayWithContext,
+    Expr<N>:
+        Signed + HasPosExp + Clone + Inv<Output = Expr<N>> + From<(i32, i32)> + PartialEq<Expr<N>>,
+{
+    type Error = fmt::Error;
+
+    #[inline]
+    fn get_buf(&mut self) -> &mut dyn fmt::Write {
+        self.buf
+    }
+
+    fn fmt_num(&mut self, num: &N) -> Result<(), Self::Error>
+    where
+        N: DisplayWithContext,
+    {
+        write!(self.buf, "{}", num.display_in(self.radix, self.config))
+    }
+
+    fn fmt_power(&mut self, base: &Expr<N>, exp: &Expr<N>) -> Result<(), Self::Error> {
+        if *exp == Expr::from((1, 2)) {
+            self.buf.write_str("sqrt")?;
+            self.fmt_in_parens(base)?;
+        } else if *exp == Expr::from((1, 3)) {
+            self.buf.write_str("cbrt")?;
+            self.fmt_in_parens(base)?;
+        } else {
+            self.fmt_child(Precedence::Power, base)?;
+            self.buf.write_char('^')?;
+            self.fmt_child(Precedence::Power, exp)?;
+        }
+
+        Ok(())
+    }
+
+    fn fmt_log(&mut self, base: &Expr<N>, arg: &Expr<N>) -> Result<(), Self::Error> {
+        self.buf.write_str("log")?;
+        self.fmt_in_parens(base)?;
+        self.fmt_in_parens(arg)?;
+        Ok(())
+    }
+
+    fn fmt_var(&mut self, var: &str) -> Result<(), Self::Error> {
+        self.buf.write_str(var)
+    }
+
+    fn fmt_const(&mut self, cnst: Const) -> Result<(), Self::Error> {
+        write!(self.buf, "{cnst}")
+    }
+
+    fn fmt_mod(&mut self, lhs: &Expr<N>, rhs: &Expr<N>) -> Result<(), Self::Error> {
+        self.fmt_child(Precedence::Product, lhs)?;
+        self.buf.write_char('%')?;
+        self.fmt_child(Precedence::Product, rhs)?;
+        Ok(())
+    }
+
+    fn fmt_sin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.buf.write_str("sin(")?; // )
+        self.fmt(arg)?;
+        write!(self.buf, " {units})")?;
+        Ok(())
+    }
+
+    fn fmt_cos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.buf.write_str("cos(")?; // )
+        self.fmt(arg)?;
+        write!(self.buf, " {units})")?;
+        Ok(())
+    }
+
+    fn fmt_tan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.buf.write_str("tan(")?; // )
+        self.fmt(arg)?;
+        write!(self.buf, " {units})")?;
+        Ok(())
+    }
+
+    fn fmt_asin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.buf.write_str("(asin")?; // ))
+        self.fmt_in_parens(arg)?;
+        write!(self.buf, " {units})")?;
+        Ok(())
+    }
+
+    fn fmt_acos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.buf.write_str("(acos")?; // ))
+        self.fmt_in_parens(arg)?;
+        write!(self.buf, " {units})")?;
+        Ok(())
+    }
+
+    fn fmt_atan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.buf.write_str("(atan")?; // ))
+        self.fmt_in_parens(arg)?;
+        write!(self.buf, " {units})")?;
+        Ok(())
+    }
+
+    fn fmt_in_parens(&mut self, inner: impl Formattable<N, Self>) -> Result<(), Self::Error>
+    where
+        Expr<N>: Signed,
+        N: DisplayWithContext,
+    {
+        self.buf.write_char('(')?; // :)
+        inner.fmt_to(self)?;
+        self.buf.write_char(')')?;
+        Ok(())
+    }
+
+    fn fmt_frac(
+        &mut self,
+        numer: impl Iterator<Item = impl Formattable<N, Self>>,
+        denom: impl Iterator<Item = impl Formattable<N, Self>>,
+    ) -> Result<(), Self::Error> {
+        self.fmt_frac_component(numer)?;
+        self.buf.write_char('/')?;
+        self.fmt_frac_component(denom)?;
+
+        Ok(())
+    }
+
+    fn write_product_separator(&mut self) -> Result<(), Self::Error> {
+        self.buf.write_char('·')
+    }
+}
 
 /// **Expression** types for which you can tell the sign of their exponent, sometimes in a smart
 /// way. Ideally, this should be blanket implemented for all `Expr<T> where T: Signed` paired
@@ -54,156 +366,30 @@ impl HasPosExp for Expr<f64> {
     }
 }
 
-impl<N> Expr<N>
-where
-    Self: HasPosExp + Clone + Inv<Output = Self> + One + Signed + From<(i32, i32)>,
-    N: Zero + One + Clone + for<'a> Product<&'a N> + PartialEq + Signed + DisplayWithContext,
-{
-    /// Render the sum `self`, with terms `ts`.
-    pub fn display_sum(&self, ts: &[Self], radix: Radix, config: &Config) -> String {
-        let mut s = String::new();
-
-        let (pos, neg): (Vec<&Self>, Vec<&Self>) = ts.iter().partition(|t| t.is_positive());
-
-        s.push_str(
-            &pos.iter()
-                .map(|t| self.display_child(t, radix, config))
-                .collect::<Vec<_>>()
-                .join("+"),
-        );
-
-        for n in neg {
-            s.push_str(&format!(
-                "-{}",
-                self.display_child(&n.clone().neg(), radix, config)
-            ));
-        }
-
-        s
-    }
-
-    /// Use the grouping priority of `self` and `child` to decide wether or not to surround `child` in parens, then format it.
-    pub fn display_child(&self, child: &Self, radix: Radix, config: &Config) -> String {
-        if child.grouping_priority() > self.grouping_priority() || child.is_mod() {
-            format!("({})", child.display(radix, config))
-        } else {
-            child.display(radix, config)
-        }
-    }
-
-    /// Format this expression, but don't try to split products into a numerator and denominator.
-    pub fn product_safe_format(&self, child: &Self, radix: Radix, config: &Config) -> String {
-        match child {
-            Self::Product(v) => {
-                let str = v
-                    .iter()
-                    .map(|t| self.display_child(t, radix, config))
-                    .collect::<Vec<_>>()
-                    .join("·");
-
-                if child.grouping_priority() > self.grouping_priority() {
-                    format!("({})", str)
-                } else {
-                    str
-                }
-            }
-            other => self.display_child(other, radix, config),
-        }
-    }
-
-    /// Render the product `self`, with factors `fs`.
-    pub fn display_product(&self, fs: &[Self], radix: Radix, config: &Config) -> String {
-        let (numer_vec, denom_vec): (Vec<&Self>, Vec<&Self>) =
-            fs.iter().partition(|&f| f.has_pos_exp());
-
-        let mut numer = Self::Product(numer_vec.into_iter().map(Clone::clone).collect());
-        let mut denom = Self::Product(denom_vec.into_iter().map(|f| f.clone().inv()).collect());
-        numer.correct();
-        denom.correct();
-
-        format!(
-            "{}{}",
-            self.product_safe_format(&numer, radix, config),
-            if denom.is_one() {
-                String::new()
-            } else {
-                format!("/{}", self.product_safe_format(&denom, radix, config))
-            }
-        )
-    }
-
-    /// Render the power expression `self`, with base `b` and exponent `e`.
-    pub fn display_power(&self, b: &Self, e: &Self, radix: Radix, config: &Config) -> String {
-        if *e == Self::from((1, 2)) {
-            format!("sqrt({})", b.display(radix, config))
-        } else if *e == Self::from((1, 3)) {
-            format!("cbrt({})", b.display(radix, config))
-        } else if *e == Self::from((1, 2)).neg() {
-            format!("1/sqrt({})", b.display(radix, config))
-        } else if *e == Self::from((1, 3)).neg() {
-            format!("1/cbrt({})", b.display(radix, config))
-        } else {
-            format!(
-                "{}^{}",
-                self.display_child(b, radix, config),
-                self.display_child(e, radix, config)
-            )
-        }
-    }
-
-    /// Render `self` to a string with the given preferences.
-    pub fn display(&self, radix: Radix, config: &Config) -> String {
-        match self {
-            Self::Num(n) => n.display_in(radix, config),
-            Self::Sum(ts) => self.display_sum(ts, radix, config),
-            Self::Product(fs) => self.display_product(fs, radix, config),
-            Self::Power(b, e) => self.display_power(b, e, radix, config),
-            Self::Var(s) => s.to_string(),
-            Self::Const(c) => format!("{c}"),
-            Self::Mod(x, y) => format!(
-                "{} mod {}",
-                self.display_child(x, radix, config),
-                self.display_child(y, radix, config)
-            ),
-            Self::Log(b, a) => format!(
-                "log({})({})",
-                b.display(radix, config),
-                a.display(radix, config)
-            ),
-            Self::Sin(t, m) => format!("sin({} {m})", t.display(radix, config)),
-            Self::Cos(t, m) => format!("cos({} {m})", t.display(radix, config)),
-            Self::Tan(t, m) => format!("tan({} {m})", t.display(radix, config)),
-            Self::Asin(t, m) => format!("(arcsin({}) {m})", t.display(radix, config)),
-            Self::Acos(t, m) => format!("(arccos({}) {m})", t.display(radix, config)),
-            Self::Atan(t, m) => format!("(arctan({}) {m})", t.display(radix, config)),
-        }
-    }
-}
-
 impl<N> Expr<N> {
-    /// The grouping priority of an expression represents its position in the order of operations;
-    /// higher priority means further along in the order, i.e. addition has a higher priority than exponentiation.
-    pub fn grouping_priority(&self) -> u8
+    /// Returns the [`Precedence`] of this expression (its position in the order of operations).
+    pub fn precedence(&self) -> Precedence
     where
         N: Signed,
     {
         match self {
             Self::Num(n) => {
                 if n.is_negative() {
-                    4
+                    Precedence::Negative
                 } else {
-                    0
+                    Precedence::Zero
                 }
             }
-            Self::Power(..) => 1,
-            Self::Product(..) => 2,
-            Self::Sum(..) => 3,
-            _ => 0,
+            Self::Power(..) => Precedence::Power,
+            Self::Product(..) => Precedence::Product,
+            Self::Sum(..) => Precedence::Sum,
+            _ => Precedence::Zero,
         }
     }
 
-    /// Represents its desired position in a product; i.e., coefficients have a higher priority than
-    /// variables.
+    /// Represents its desired position in a product; i.e., coefficients have a higher priority
+    /// than variables.
+    // TODO: does this really need to be covered by the blanket `N: Signed` bound on this impl?
     pub const fn product_priority(&self) -> u8 {
         match self {
             Self::Num(_) => 0,
@@ -213,5 +399,21 @@ impl<N> Expr<N> {
             Self::Const(_) => 3,
             _ => 5,
         }
+    }
+
+    /// Displays the given expression in the given radix with the given configuration using the
+    /// [default formatter](DefaultFormatter)
+    pub fn display(&self, radix: Radix, config: &Config) -> String
+    where
+        N: Signed,
+        Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+        for<'a> DefaultFormatter<'a>: ExprFormatter<N>,
+        for<'a> <DefaultFormatter<'a> as ExprFormatter<N>>::Error: fmt::Debug,
+    {
+        let mut s = String::new();
+        let mut formatter = DefaultFormatter::new(config, radix, &mut s);
+        // `<String as fmt::Write>::write_str` will not fail
+        formatter.fmt(self).unwrap();
+        s
     }
 }
