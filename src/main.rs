@@ -133,7 +133,10 @@ impl StackItem {
 impl Display for StackItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.debug {
-            return write!(f, "{:?}", self.expr);
+            match self.display_mode {
+                DisplayMode::Exact => return write!(f, "{:?}", self.expr),
+                DisplayMode::Approx => return write!(f, "{:?}", self.expr.clone().approx()),
+            }
         }
 
         match self.display_mode {
