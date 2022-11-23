@@ -18,6 +18,7 @@ argh = "0.1"
 num = "0.4"
 derive_more = "0.99"
 proptest-derive = "0.3.0"
+thiserror = "1.0.37"
 
 [dev-dependencies.proptest]
 version = "1"

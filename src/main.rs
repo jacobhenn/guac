@@ -21,8 +21,8 @@ use crate::{
 };
 
 use std::{
-    fmt::Display,
-    io::{stdin, stdout, BufRead, BufReader, StdoutLock, Write},
+    fmt::{Display, Write},
+    io::{stdin, stdout, BufRead, BufReader, StdoutLock, Write as _},
     mem,
     process::exit,
 };
@@ -39,7 +39,7 @@ use crossterm::{
     ExecutableCommand, QueueableCommand,
 };
 
-use num::{traits::Pow, BigRational};
+use num::{traits::Pow, BigRational, FromPrimitive};
 
 /// Provides the `Expr` type and various methods for working with it
 pub mod expr;
@@ -64,191 +64,81 @@ mod args;
 #[cfg(test)]
 mod tests;
 
-// macro_rules! trait_alias {
-//     ( $name:ident: $traits:tt; ) => {
-//         trait $name: $traits {}
+/// A way to display an expression to the screen, either exact or approximate.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DisplayMode {
+    /// Display the expression exactly, using fractions.
+    Exact,
 
-//         impl<T> $name for T where T: $($tr +)+ {}
-//     }
-// }
-
-/// Either an exact expression (`Expr<BigRational>`) or an approximate one (`Expr<f64>`).
-#[derive(Clone, PartialEq, Debug)]
-pub enum StackExpr {
-    /// An exact expression.
-    Exact(Expr<BigRational>),
-
-    /// An approximate expression.
-    Approx(Expr<f64>),
+    /// Display the expression approximately, using floats.
+    Approx,
 }
 
-/// The component of [`StackItem`] that is dependent on the exactness of its backing expression.
-#[derive(Clone, PartialEq, Debug)]
-pub enum StackVal {
-    /// A stack value that is backed by an exact expression, and can therefore be displayed as
-    /// either an exact or approximate expression.
-    Exact {
-        /// The exact expression that serves as this [`StackVal`]'s true value.
-        exact_expr: Expr<BigRational>,
-
-        /// The approximation of `exact_expr`.
-        approx_expr: Expr<f64>,
-
-        /// The string rendering of `exact_expr`.
-        exact_str: String,
-
-        /// The string rendering of `approx_str`.
-        approx_str: String,
-
-        /// Whether to display the exact or approximate version of this value.
-        is_approx: bool,
-    },
-
-    /// A stack value that is backed by an approximate expression, and can therefore only be
-    /// displayed as an approximate expression.
-    Approx {
-        /// The approximate expression that serves as this [`StackVal`]'s true value.
-        approx_expr: Expr<f64>,
-
-        /// The string rendering of `approx_expr`.
-        approx_str: String,
-    },
-}
-
-impl StackVal {
-    const fn approx_expr(&self) -> &Expr<f64> {
-        match self {
-            Self::Exact { approx_expr, .. } | Self::Approx { approx_expr, .. } => approx_expr,
-        }
-    }
-
-    // destructors cannot be evaluated at compile time
-    #[allow(clippy::missing_const_for_fn)]
-    fn into_approx_expr(self) -> Expr<f64> {
-        match self {
-            Self::Exact { approx_expr, .. } | Self::Approx { approx_expr, .. } => approx_expr,
-        }
-    }
-
-    fn apply_binary<ExactF, ApproxF, Return>(
-        lhs: &Self,
-        rhs: &Self,
-        exact_f: ExactF,
-        approx_f: ApproxF,
-    ) -> Return
-    where
-        ExactF: Fn(&Expr<BigRational>, &Expr<BigRational>) -> Return,
-        ApproxF: Fn(&Expr<f64>, &Expr<f64>) -> Return,
-    {
-        if let (
-            Self::Exact {
-                exact_expr: lhs_exact_expr,
-                ..
-            },
-            Self::Exact {
-                exact_expr: rhs_exact_expr,
-                ..
-            },
-        ) = (lhs, rhs)
-        {
-            exact_f(lhs_exact_expr, rhs_exact_expr)
+impl DisplayMode {
+    /// Combine two display modes into a new one that represents the "least default" of the two
+    /// passed in.
+    ///
+    /// - If either are [`DisplayMode::Approx`], it returns [`DisplayMode::Approx`].
+    /// - Only if both are [`DisplayMode::Exact`] will it return [`DisplayMode::Exact`].
+    fn combine(this: Self, that: Self) -> Self {
+        if this == Self::Exact && that == Self::Exact {
+            Self::Exact
         } else {
-            approx_f(lhs.approx_expr(), rhs.approx_expr())
-        }
-    }
-
-    fn apply_unary<ExactF, ApproxF, Return>(&self, exact_f: ExactF, approx_f: ApproxF) -> Return
-    where
-        ExactF: Fn(&Expr<BigRational>) -> Return,
-        ApproxF: Fn(&Expr<f64>) -> Return,
-    {
-        match self {
-            Self::Exact { exact_expr, .. } => exact_f(exact_expr),
-            Self::Approx { approx_expr, .. } => approx_f(approx_expr),
+            Self::Approx
         }
     }
 }
 
 /// An expression, along with other data necessary for displaying it but not for doing math with it.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StackItem {
-    val: StackVal,
+    expr: Expr<BigRational>,
+    exact_str: String,
+    approx_str: String,
+    display_mode: DisplayMode,
+    debug: bool,
     radix: Radix,
 }
 
 impl StackItem {
     /// Create a new `StackItem` containing an exact expression and cache its rendered strings.
     #[must_use]
-    pub fn new_exact(exact_expr: Expr<BigRational>, radix: Radix, config: &Config) -> Self {
-        let approx_expr = exact_expr.clone().approx();
-        let exact_str = exact_expr.display(radix, config);
+    pub fn new(
+        expr: Expr<BigRational>,
+        radix: Radix,
+        config: &Config,
+        display_mode: DisplayMode,
+        debug: bool,
+    ) -> Self {
+        let approx_expr = expr.clone().approx();
+        let exact_str = expr.display(radix, config);
         let approx_str = approx_expr.display(radix, config);
         Self {
-            val: StackVal::Exact {
-                exact_expr,
-                approx_expr,
-                exact_str,
-                approx_str,
-                is_approx: false,
-            },
-            radix,
-        }
-    }
-
-    /// Create a new `StackItem` containing an approximate expression and cache its rendered string.
-    #[must_use]
-    pub fn new_approx(approx_expr: Expr<f64>, radix: Radix, config: &Config) -> Self {
-        let approx_str = approx_expr.display(radix, config);
-        Self {
-            val: StackVal::Approx {
-                approx_expr,
-                approx_str,
-            },
+            expr,
+            exact_str,
+            approx_str,
+            display_mode,
+            debug,
             radix,
         }
     }
 
     /// Update the cached strings in a stack item.
     pub fn rerender(&mut self, config: &Config) {
-        match &mut self.val {
-            StackVal::Exact {
-                exact_expr,
-                approx_expr,
-                exact_str,
-                approx_str,
-                ..
-            } => {
-                *exact_str = exact_expr.display(self.radix, config);
-                *approx_str = approx_expr.display(self.radix, config);
-            }
-            StackVal::Approx {
-                approx_expr,
-                approx_str,
-            } => {
-                *approx_str = approx_expr.display(self.radix, config);
-            }
-        }
+        self.exact_str = self.expr.display(self.radix, config);
+        self.approx_str = self.expr.clone().approx().display(self.radix, config);
     }
 }
 
 impl Display for StackItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.val {
-            StackVal::Exact {
-                exact_str,
-                approx_str,
-                is_approx,
-                ..
-            } => {
-                if *is_approx {
-                    write!(f, "{approx_str}")
-                } else {
-                    write!(f, "{exact_str}")
-                }
-            }
-            StackVal::Approx { approx_str, .. } => {
-                write!(f, "{approx_str}")
-            }
+        if self.debug {
+            return write!(f, "{:?}", self.expr);
+        }
+
+        match self.display_mode {
+            DisplayMode::Exact => f.write_str(&self.exact_str),
+            DisplayMode::Approx => f.write_str(&self.approx_str),
         }
     }
 }
@@ -307,9 +197,9 @@ impl<'a> State<'a> {
     }
 
     /// Return the index of the selected item, or the last item if none are selected.
+    // TODO: see if i can replace this with a `Fn(&self) -> Option<[&[mut ]]Expr>` family
     fn selected_or_last_idx(&self) -> Option<usize> {
-        self.select_idx
-            .map_or_else(|| self.stack.len().checked_sub(1), Some)
+        self.select_idx.or_else(|| self.stack.len().checked_sub(1))
     }
 
     fn render(&mut self) -> Result<(), Error> {
@@ -324,24 +214,20 @@ impl<'a> State<'a> {
         let mut s = String::new();
         // the apparent length of `s`, excluding formatting codes
         let mut len: usize = 0;
-        // the midpoint of the selected expression, not as an index of `s`, but as an `x` coordinate of a terminal cell; `None` if no expression is selected
-        let mut selected_pos = None;
+        // the midpoint of the selected expression, not as an index of `s`, but as an `x`
+        // coordinate of a terminal cell; `None` if no expression is selected
+        let mut selected_pos: Option<usize> = None;
 
         for i in 0..self.stack.len() {
             let stack_item = &self.stack[i];
-
-            let expr_str = if option_env!("GUAC_DEBUG") == Some("true") {
-                format!("{:?}", stack_item.val)
-            } else {
-                stack_item.to_string()
-            };
+            let expr_str = stack_item.to_string();
 
             // if the current expression we're looking at is selected, assign to `selected_pos`
             if Some(i) == self.select_idx {
                 selected_pos = Some(len + expr_str.len() / 2);
                 s.push_str(&format!("{} ", expr_str.underline()));
             } else {
-                s.push_str(&format!("{expr_str} "));
+                write!(&mut s, "{expr_str} ").unwrap();
             }
 
             len += expr_str.len() + 1;
@@ -424,19 +310,14 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    fn push_exact_expr(&mut self, expr: Expr<BigRational>, radix: Radix) {
-        self.push_stack_item(StackItem::new_exact(expr, radix, &self.config));
-    }
-
-    fn push_approx_expr(&mut self, expr: Expr<f64>, radix: Radix) {
-        self.push_stack_item(StackItem::new_approx(expr, radix, &self.config));
-    }
-
-    fn push_expr(&mut self, expr: StackExpr, radix: Radix) {
-        match expr {
-            StackExpr::Exact(expr) => self.push_exact_expr(expr, radix),
-            StackExpr::Approx(expr) => self.push_approx_expr(expr, radix),
-        }
+    fn push_expr(&mut self, expr: Expr<BigRational>, radix: Radix, display_mode: DisplayMode) {
+        self.push_stack_item(StackItem::new(
+            expr,
+            radix,
+            &self.config,
+            display_mode,
+            false,
+        ));
     }
 
     fn push_stack_item(&mut self, stack_item: StackItem) {
@@ -468,21 +349,26 @@ impl<'a> State<'a> {
             .ok_or(SoftError::BadInput)
     }
 
-    fn parse_approx_expr(&self, s: &str) -> Result<Expr<f64>, SoftError> {
+    // TODO: maunally parsing non-dec floats seems easy enough
+    fn parse_approx_expr(&self, s: &str) -> Result<Expr<BigRational>, SoftError> {
         if self.input_radix.unwrap_or(self.config.radix) == Radix::DECIMAL {
-            s.parse().map_err(|_| SoftError::BadInput).map(Expr::Num)
+            s.parse::<f64>()
+                .ok()
+                .and_then(BigRational::from_f64)
+                .ok_or(SoftError::BadInput)
+                .map(Expr::Num)
         } else {
             Err(SoftError::NonDecFloat)
         }
     }
 
-    fn parse_expr(&self, s: &str) -> Result<StackExpr, SoftError> {
+    fn parse_expr(&self, s: &str) -> Result<(DisplayMode, Expr<BigRational>), SoftError> {
         if s.contains('.') {
             let e = self.parse_approx_expr(s)?;
-            Ok(StackExpr::Approx(e))
+            Ok((DisplayMode::Approx, e))
         } else {
             let e = self.parse_exact_expr(s)?;
-            Ok(StackExpr::Exact(e))
+            Ok((DisplayMode::Exact, e))
         }
     }
 
@@ -514,26 +400,12 @@ impl<'a> State<'a> {
             .map(|eex_input| radix.parse_bigint(eex_input).ok_or(SoftError::BadRadix))
             .transpose()?;
 
-        match self.parse_expr(&self.input)? {
-            StackExpr::Approx(mut expr) => {
-                if let Some(eex) = eex {
-                    if let Ok(eex) = i128::try_from(eex).map(|n| n as f64) {
-                        expr *= Expr::from(radix).pow(Expr::Num(eex));
-                    } else {
-                        return Err(SoftError::BigEex);
-                    }
-                }
+        let (display_mode, mut expr) = self.parse_expr(&self.input)?;
+        if let Some(eex) = eex {
+            expr *= Expr::from(radix).pow(Expr::from(eex));
+        }
 
-                self.push_approx_expr(expr, radix);
-            }
-            StackExpr::Exact(mut expr) => {
-                if let Some(eex) = eex {
-                    expr *= Expr::from(radix).pow(Expr::from(eex));
-                }
-
-                self.push_exact_expr(expr, radix);
-            }
-        };
+        self.push_expr(expr, radix, display_mode);
 
         let prev_input = mem::take(&mut self.input);
         self.eex_input = None;
@@ -548,23 +420,16 @@ impl<'a> State<'a> {
         if !self.input.is_empty() {
             let radix = self.input_radix.unwrap_or(self.config.radix);
             let input = mem::take(&mut self.input);
-            self.push_exact_expr(Expr::Var(input), radix);
+            self.push_expr(Expr::Var(input), radix, DisplayMode::Exact);
         }
     }
 
-    fn apply_binary<ExactF, ApproxF, ExactDomain, ApproxDomain>(
+    // TODO: add an apply_binary_always function? would be useful if it could just return ().
+    fn apply_binary(
         &mut self,
-        exact_f: ExactF,
-        approx_f: ApproxF,
-        are_in_domain_exact: ExactDomain,
-        are_in_domain_approx: ApproxDomain,
-    ) -> Result<(), SoftError>
-    where
-        ExactF: Fn(Expr<BigRational>, Expr<BigRational>) -> Expr<BigRational>,
-        ApproxF: Fn(Expr<f64>, Expr<f64>) -> Expr<f64>,
-        ExactDomain: Fn(&Expr<BigRational>, &Expr<BigRational>) -> Option<SoftError>,
-        ApproxDomain: Fn(&Expr<f64>, &Expr<f64>) -> Option<SoftError>,
-    {
+        f: impl Fn(Expr<BigRational>, Expr<BigRational>) -> Expr<BigRational>,
+        are_in_domain: impl Fn(&Expr<BigRational>, &Expr<BigRational>) -> Option<SoftError>,
+    ) -> Result<(), SoftError> {
         let prev_input = if self.select_idx.is_none() {
             self.push_input()?
         } else {
@@ -577,12 +442,7 @@ impl<'a> State<'a> {
 
         let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
 
-        if let Some(e) = StackVal::apply_binary(
-            &self.stack[idx - 1].val,
-            &self.stack[idx].val,
-            are_in_domain_exact,
-            are_in_domain_approx,
-        ) {
+        if let Some(e) = are_in_domain(&self.stack[idx - 1].expr, &self.stack[idx].expr) {
             if let Some(prev_input) = prev_input {
                 self.stack.pop();
                 self.input = prev_input;
@@ -594,28 +454,17 @@ impl<'a> State<'a> {
         let x = self.stack.remove(idx - 1);
         let y = self.stack.remove(idx - 1);
 
-        let radix = x.radix;
+        let display_mode = DisplayMode::combine(x.display_mode, y.display_mode);
 
-        // TODO: (when let-chains come out) you know what you did
-        let item = if let (
-            StackVal::Exact {
-                exact_expr: lhs_exact_expr,
-                ..
-            },
-            StackVal::Exact {
-                exact_expr: rhs_exact_expr,
-                ..
-            },
-        ) = (x.val.clone(), y.val.clone())
-        {
-            StackItem::new_exact(exact_f(lhs_exact_expr, rhs_exact_expr), radix, &self.config)
-        } else {
-            StackItem::new_approx(
-                approx_f(x.val.into_approx_expr(), y.val.into_approx_expr()),
-                radix,
-                &self.config,
-            )
-        };
+        // TODO: is this equivalent to `self.push_stack_item(..)`?
+        // TODO: combine their debugness as well
+        let item = StackItem::new(
+            f(x.expr, y.expr),
+            x.radix,
+            &self.config,
+            display_mode,
+            x.debug || y.debug,
+        );
 
         self.stack.insert(idx - 1, item);
 
@@ -626,19 +475,12 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    fn apply_unary<ExactF, ApproxF, ExactDomain, ApproxDomain>(
+    fn apply_unary(
         &mut self,
-        exact_f: ExactF,
-        approx_f: ApproxF,
-        is_in_domain_exact: ExactDomain,
-        is_in_domain_approx: ApproxDomain,
-    ) -> Result<(), SoftError>
-    where
-        ExactF: Fn(Expr<BigRational>) -> Expr<BigRational>,
-        ApproxF: Fn(Expr<f64>) -> Expr<f64>,
-        ExactDomain: Fn(&Expr<BigRational>) -> Option<SoftError>,
-        ApproxDomain: Fn(&Expr<f64>) -> Option<SoftError>,
-    {
+        f: impl Fn(Expr<BigRational>) -> Expr<BigRational>,
+        // TODO: rename these arguments
+        is_in_domain: impl Fn(&Expr<BigRational>) -> Option<SoftError>,
+    ) -> Result<(), SoftError> {
         let prev_input = if self.select_idx.is_none() {
             self.push_input()?
         } else {
@@ -651,10 +493,7 @@ impl<'a> State<'a> {
 
         let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
 
-        if let Some(e) = self.stack[idx]
-            .val
-            .apply_unary(is_in_domain_exact, is_in_domain_approx)
-        {
+        if let Some(e) = is_in_domain(&self.stack[idx].expr) {
             if let Some(prev_input) = prev_input {
                 self.stack.pop();
                 self.input = prev_input;
@@ -664,16 +503,7 @@ impl<'a> State<'a> {
         }
 
         let x = self.stack.remove(idx);
-
-        let item = match x.val {
-            StackVal::Exact { exact_expr, .. } => {
-                StackItem::new_exact(exact_f(exact_expr), x.radix, &self.config)
-            }
-            StackVal::Approx { approx_expr, .. } => {
-                StackItem::new_approx(approx_f(approx_expr), x.radix, &self.config)
-            }
-        };
-
+        let item = StackItem::new(f(x.expr), x.radix, &self.config, x.display_mode, x.debug);
         self.stack.insert(idx, item);
 
         Ok(())
@@ -699,13 +529,18 @@ impl<'a> State<'a> {
     }
 
     fn toggle_approx(&mut self) {
-        let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
-        if let Some(StackItem {
-            val: StackVal::Exact { is_approx, .. },
-            ..
-        }) = self.stack.get_mut(idx)
-        {
-            *is_approx = !*is_approx;
+        if let Some(idx) = self.selected_or_last_idx() {
+            let m = &mut self.stack[idx].display_mode;
+            match m {
+                DisplayMode::Approx => *m = DisplayMode::Exact,
+                DisplayMode::Exact => *m = DisplayMode::Approx,
+            }
+        }
+    }
+
+    fn toggle_debug(&mut self) {
+        if let Some(idx) = self.selected_or_last_idx() {
+            self.stack[idx].debug = !self.stack[idx].debug;
         }
     }
 
@@ -723,8 +558,8 @@ impl<'a> State<'a> {
         while let Some(Ok(line)) = lines.next() {
             idx += 1;
             let line: String = line.chars().filter(|c| !c.is_whitespace()).collect();
-            if let Ok(e) = self.parse_expr(&line) {
-                self.push_expr(e, self.config.radix);
+            if let Ok((m, e)) = self.parse_expr(&line) {
+                self.push_expr(e, self.config.radix, m);
             } else {
                 bad_idxs.push(idx);
             }
@@ -794,7 +629,7 @@ impl<'a> State<'a> {
                         // TODO: decide if we really need to render the whole stack here
                         self.write_modeline().context("couldn't write modeline")?;
                         self.render().context("couldn't render the state")?;
-                    },
+                    }
                 }
             }
         }

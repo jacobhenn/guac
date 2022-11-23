@@ -1,7 +1,7 @@
 use crate::{
     expr::{constant::Const, Expr},
     radix::{self, Radix},
-    error::SoftError, State,
+    error::SoftError, State, DisplayMode,
 };
 
 use std::fmt::Display;
@@ -164,7 +164,7 @@ impl<'a> State<'a> {
 
     /// Push an exact expression containing the constant `c` to the stack.
     pub fn push_const(&mut self, c: Const) {
-        self.push_exact_expr(Expr::Const(c), self.config.radix);
+        self.push_expr(Expr::Const(c), self.config.radix, DisplayMode::Exact);
     }
 
     /// Constant mode: push a `Const` to the stack.
@@ -273,37 +273,5 @@ impl<'a> State<'a> {
         }
 
         Ok(Status::Render)
-    }
-}
-
-/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
-#[macro_export]
-macro_rules! apply_binary {
-    ( $state:expr, $f:expr, $domain:expr ) => {
-        $state.apply_binary($f, $f, $domain, $domain)?
-    }
-}
-
-/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
-#[macro_export]
-macro_rules! apply_binary_always {
-    ( $state:expr, $f:expr ) => {
-        $state.apply_binary($f, $f, |_, _| None, |_, _| None)?
-    }
-}
-
-/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
-#[macro_export]
-macro_rules! apply_unary {
-    ( $state:expr, $f:expr, $domain:expr ) => {
-        $state.apply_unary($f, $f, $domain, $domain)?
-    }
-}
-
-/// An unpleasent helper macro for [`State::apply_binary`] that will hopefully go away soon
-#[macro_export]
-macro_rules! apply_unary_always {
-    ( $state:expr, $f:expr ) => {
-        $state.apply_unary($f, $f, |_| None, |_| None)?
     }
 }

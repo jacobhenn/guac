@@ -25,6 +25,9 @@ pub mod trig;
 /// Casting from expressions to other types and vice versa.
 pub mod cast;
 
+// /// A function and various types for parsing an expression from simple math latex.
+// pub mod parse_latex;
+
 // /// Units. All of them.
 // pub mod unit;
 

@@ -39,6 +39,8 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 
 *see this list in the terminal by running* `guac keys`.
 
+*here, "selected expression" refers to either the manually selected expression, or the topmost expression in the stack (not the input) if none is selected*
+
 - `q` or `escape`: **q**uit
 - digit, `.`, or `e`: type a number in the input (`e` for e-notation)
 - `#` enter radix mode (see the [wiki](https://github.com/jacobhenn/guac/wiki/radices))
@@ -54,14 +56,15 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 - `` ` ``: reciprocal
 - `~`: opposite (by analogy to Vim's `~`)
 - `\`: absolute value (by proximity to `|`)
-- `d`: **d**rop the selected expression, or the topmost expression if the input is selected
+- `d`: **d**rop the selected expression
 - `^`: exponentiate
 - `g`: natural lo**g**
 - `G`: lo**g** with given base
 - `r`: square **r**oot
 - `R`: square
 - `%`: modulo
-- `;`: toggle the selected (or topmost) expression's display mode between exact and approximate
+- `;`: toggle the selected expression's display mode between exact and approximate
+- `[`: toggle displaying the selected expression in debug view
 - `s`: **s**ine
 - `c`: **c**osine
 - `t`: **t**angent
@@ -70,12 +73,12 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 - `l`: select to the right (by analogy to Vim's `l`)
 - `>`: move selected expression to the right (by analogy to Vim's `>>`)
 - `<`: move selected expression to the left (by analogy to Vim's `<<`)
-- `right`: swap the selected expression (or the topmost one) with the expression to its left
+- `right`: swap the selected expression with the expression to its left
 - `a`: cancel selection and jump to input (by analogy to Vim's `A`)
 - `:`: enter command mode (by analogy to Vim's `:`) (see the [wiki](https://github.com/jacobhenn/guac/wiki/commands))
 - `|`: enter **pipe** mode
     - any char: type a command (to be executed directly, **not** through your `$SHELL`)
-    - `enter`: pipe the selected expression (or the topmost one) to the entered command
+    - `enter`: pipe the selected expression to the entered command
     - `escape`: cancel
 - `v`: enter **v**ariable mode
     - any char: type in a custom variable name
