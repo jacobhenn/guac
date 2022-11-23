@@ -36,6 +36,49 @@ where
     /// Get a mutable reference to the internal buffer.
     fn get_buf(&mut self) -> &mut dyn fmt::Write;
 
+    /// Format the given inner item in parentheses.
+    fn fmt_in_parens(&mut self, inner: impl Formattable<N, Self>) -> Result<(), Self::Error>;
+
+    fn fmt_fn_call(
+        &mut self,
+        name: impl Formattable<N, Self>,
+        inner: impl Formattable<N, Self>,
+    ) -> Result<(), Self::Error>;
+
+    /// Format the given inner item to the buffer; if its precedence is higher than the given
+    /// precedence of the outer expression, format it in parentheses.
+    fn fmt_child(
+        &mut self,
+        parent_precedence: Precedence,
+        child: &Expr<N>,
+    ) -> Result<(), Self::Error> {
+        if parent_precedence < child.precedence() {
+            self.fmt_in_parens(child)
+        } else {
+            self.fmt(child)
+        }
+    }
+
+    /// Format the given expression to the buffer.
+    fn fmt(&mut self, expr: &Expr<N>) -> Result<(), Self::Error> {
+        match expr {
+            Expr::Num(n) => self.fmt_num(n),
+            Expr::Sum(ts) => self.fmt_sum(ts),
+            Expr::Product(fs) => self.fmt_product(fs),
+            Expr::Power(b, e) => self.fmt_power(b, e),
+            Expr::Log(b, a) => self.fmt_log(b, a),
+            Expr::Var(s) => self.fmt_var(s),
+            Expr::Const(c) => self.fmt_const(*c),
+            Expr::Mod(x, y) => self.fmt_mod(x, y),
+            Expr::Sin(x, m) => self.fmt_sin(x, *m),
+            Expr::Cos(x, m) => self.fmt_cos(x, *m),
+            Expr::Tan(x, m) => self.fmt_tan(x, *m),
+            Expr::Asin(x, m) => self.fmt_asin(x, *m),
+            Expr::Acos(x, m) => self.fmt_acos(x, *m),
+            Expr::Atan(x, m) => self.fmt_atan(x, *m),
+        }
+    }
+
     /// Format a single number to the buffer.
     fn fmt_num(&mut self, num: &N) -> Result<(), Self::Error>;
 
@@ -108,48 +151,43 @@ where
     fn fmt_var(&mut self, var: &str) -> Result<(), Self::Error>;
     fn fmt_const(&mut self, cnst: Const) -> Result<(), Self::Error>;
     fn fmt_mod(&mut self, lhs: &Expr<N>, rhs: &Expr<N>) -> Result<(), Self::Error>;
-    fn fmt_sin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
-    fn fmt_cos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
-    fn fmt_tan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
-    fn fmt_asin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
-    fn fmt_acos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
-    fn fmt_atan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error>;
 
-    /// Format the given inner item in parentheses.
-    fn fmt_in_parens(&mut self, inner: impl Formattable<N, Self>) -> Result<(), Self::Error>;
-
-    /// Format the given inner item to the buffer; if its precedence is higher than the given
-    /// precedence of the outer expression, format it in parentheses.
-    fn fmt_child(
+    fn fmt_trig(
         &mut self,
-        parent_precedence: Precedence,
-        child: &Expr<N>,
-    ) -> Result<(), Self::Error> {
-        if parent_precedence < child.precedence() {
-            self.fmt_in_parens(child)
-        } else {
-            self.fmt(child)
-        }
+        func: impl Formattable<N, Self>,
+        arg: &Expr<N>,
+        units: AngleMeasure,
+    ) -> Result<(), Self::Error>;
+
+    fn fmt_sin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.fmt_trig("sin", arg, units)
     }
 
-    /// Format the given expression to the buffer.
-    fn fmt(&mut self, expr: &Expr<N>) -> Result<(), Self::Error> {
-        match expr {
-            Expr::Num(n) => self.fmt_num(n),
-            Expr::Sum(ts) => self.fmt_sum(ts),
-            Expr::Product(fs) => self.fmt_product(fs),
-            Expr::Power(b, e) => self.fmt_power(b, e),
-            Expr::Log(b, a) => self.fmt_log(b, a),
-            Expr::Var(s) => self.fmt_var(s),
-            Expr::Const(c) => self.fmt_const(*c),
-            Expr::Mod(x, y) => self.fmt_mod(x, y),
-            Expr::Sin(x, m) => self.fmt_sin(x, *m),
-            Expr::Cos(x, m) => self.fmt_cos(x, *m),
-            Expr::Tan(x, m) => self.fmt_tan(x, *m),
-            Expr::Asin(x, m) => self.fmt_asin(x, *m),
-            Expr::Acos(x, m) => self.fmt_acos(x, *m),
-            Expr::Atan(x, m) => self.fmt_atan(x, *m),
-        }
+    fn fmt_cos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.fmt_trig("cos", arg, units)
+    }
+
+    fn fmt_tan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.fmt_trig("tan", arg, units)
+    }
+
+    fn fmt_inv_trig(
+        &mut self,
+        func: impl Formattable<N, Self>,
+        arg: &Expr<N>,
+        units: AngleMeasure,
+    ) -> Result<(), Self::Error>;
+
+    fn fmt_asin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.fmt_inv_trig("asin", arg, units)
+    }
+
+    fn fmt_acos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.fmt_inv_trig("acos", arg, units)
+    }
+
+    fn fmt_atan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
+        self.fmt_inv_trig("atan", arg, units)
     }
 }
 
@@ -187,16 +225,28 @@ where
     }
 }
 
-// impl<N, F, G> Formattable<N, F> for G
-// where
-//     N: Signed,
-//     F: ExprFormatter<N>,
-//     G: Fn(&mut F) -> Result<(), F::Error>,
-// {
-//     fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
-//         self(f)
-//     }
-// }
+impl<N, F> Formattable<N, F> for &str
+where
+    N: Signed,
+    Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+    F: ExprFormatter<N>,
+{
+    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+        f.get_buf().write_str(self).map_err(Into::into)
+    }
+}
+
+impl<N, F, G> Formattable<N, F> for G
+where
+    N: Signed,
+    Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+    F: ExprFormatter<N>,
+    G: Fn(&mut F) -> Result<(), F::Error>,
+{
+    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+        self(f)
+    }
+}
 
 /// The (formatter)[ExprFormatter] for writing expressions to the stack under normal operation.
 pub struct DefaultFormatter<'a> {
@@ -224,6 +274,18 @@ where
     #[inline]
     fn get_buf(&mut self) -> &mut dyn fmt::Write {
         self.buf
+    }
+
+    fn fmt_fn_call(
+        &mut self,
+        name: impl Formattable<N, Self>,
+        inner: impl Formattable<N, Self>,
+    ) -> Result<(), Self::Error> {
+        name.fmt_to(self)?;
+        self.buf.write_char('(')?; // )
+        inner.fmt_to(self)?;
+        self.buf.write_char(')')?;
+        Ok(())
     }
 
     fn fmt_num(&mut self, num: &N) -> Result<(), Self::Error>
@@ -271,45 +333,35 @@ where
         Ok(())
     }
 
-    fn fmt_sin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
-        self.buf.write_str("sin(")?; // )
-        self.fmt(arg)?;
-        write!(self.buf, " {units})")?;
+    fn fmt_trig(
+        &mut self,
+        func: impl Formattable<N, Self>,
+        arg: &Expr<N>,
+        units: AngleMeasure,
+    ) -> Result<(), Self::Error> {
+        func.fmt_to(self)?;
+        self.fmt_in_parens(|this: &mut Self| {
+            this.fmt(arg)?;
+            write!(this.get_buf(), " {units}")?;
+            Ok(())
+        })?;
+
         Ok(())
     }
 
-    fn fmt_cos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
-        self.buf.write_str("cos(")?; // )
-        self.fmt(arg)?;
-        write!(self.buf, " {units})")?;
-        Ok(())
-    }
+    fn fmt_inv_trig(
+        &mut self,
+        func: impl Formattable<N, Self>,
+        arg: &Expr<N>,
+        units: AngleMeasure,
+    ) -> Result<(), Self::Error> {
+        self.fmt_in_parens(|this: &mut Self| {
+            func.fmt_to(this)?;
+            this.fmt_in_parens(arg)?;
+            write!(this.get_buf(), " {units}")?;
+            Ok(())
+        })?;
 
-    fn fmt_tan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
-        self.buf.write_str("tan(")?; // )
-        self.fmt(arg)?;
-        write!(self.buf, " {units})")?;
-        Ok(())
-    }
-
-    fn fmt_asin(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
-        self.buf.write_str("(asin")?; // ))
-        self.fmt_in_parens(arg)?;
-        write!(self.buf, " {units})")?;
-        Ok(())
-    }
-
-    fn fmt_acos(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
-        self.buf.write_str("(acos")?; // ))
-        self.fmt_in_parens(arg)?;
-        write!(self.buf, " {units})")?;
-        Ok(())
-    }
-
-    fn fmt_atan(&mut self, arg: &Expr<N>, units: AngleMeasure) -> Result<(), Self::Error> {
-        self.buf.write_str("(atan")?; // ))
-        self.fmt_in_parens(arg)?;
-        write!(self.buf, " {units})")?;
         Ok(())
     }
 
@@ -332,7 +384,6 @@ where
         self.fmt_frac_component(numer)?;
         self.buf.write_char('/')?;
         self.fmt_frac_component(denom)?;
-
         Ok(())
     }
 
