@@ -162,16 +162,16 @@ proptest! {
     ) {
         let rm = BigInt::from(m);
         let rn = BigRational::from(BigInt::from(n));
-        assert!(try_perfect_nth_root(&<BigRational as Pow<_>>::pow(rn, &rm), &rm).is_some());
+        assert!(try_perfect_nth_root(&Pow::pow(rn, &rm), &rm).is_some());
     }
 }
 
 impl NumPow for BigRational {
     fn pow(self, rhs: Self) -> Expr<Self> {
         if rhs.is_integer() {
-            Expr::Num(<Self as Pow<_>>::pow(self, rhs.numer()))
+            Expr::Num(Pow::pow(self, rhs.numer()))
         } else if let Some(root) = try_perfect_nth_root(&self, rhs.denom()) {
-            Expr::Num(Self::from(root))
+            Expr::Num(Pow::pow(Self::from(root), rhs.numer()))
         } else {
             Expr::Power(Box::new(Expr::Num(self)), Box::new(Expr::Num(rhs)))
         }
