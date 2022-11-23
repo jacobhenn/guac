@@ -139,7 +139,7 @@ where
             .filter(|f| !f.has_pos_exp())
             .map(|f| f.clone().inv());
 
-        if factors.iter().all(|f| f.has_pos_exp()) {
+        if factors.iter().all(Expr::has_pos_exp) {
             self.fmt_frac_component(numer)
         } else {
             self.fmt_frac(numer, denom)
@@ -203,6 +203,7 @@ where
     fn fmt_to(&self, f: &mut F) -> Result<(), F::Error>;
 }
 
+#[allow(clippy::use_self)]
 impl<N, F> Formattable<N, F> for Expr<N>
 where
     N: Signed,
@@ -248,7 +249,7 @@ where
     }
 }
 
-/// The (formatter)[ExprFormatter] for writing expressions to the stack under normal operation.
+/// The [formatter](ExprFormatter) for writing expressions to the stack under normal operation.
 pub struct DefaultFormatter<'a> {
     config: &'a Config,
     radix: Radix,
@@ -454,16 +455,20 @@ impl<N> Expr<N> {
 
     /// Displays the given expression in the given radix with the given configuration using the
     /// [default formatter](DefaultFormatter)
+    ///
+    /// # Panics
+    ///
+    /// This function could theoretically panic if `<String as fmt::Write>::write_str` panics. As
+    /// of the 1.65.0 standard library, this is strictly impossible.
     pub fn display(&self, radix: Radix, config: &Config) -> String
     where
         N: Signed,
-        Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
+        Self: HasPosExp + Inv<Output = Self> + Clone + Signed,
         for<'a> DefaultFormatter<'a>: ExprFormatter<N>,
         for<'a> <DefaultFormatter<'a> as ExprFormatter<N>>::Error: fmt::Debug,
     {
         let mut s = String::new();
         let mut formatter = DefaultFormatter::new(config, radix, &mut s);
-        // `<String as fmt::Write>::write_str` will not fail
         formatter.fmt(self).unwrap();
         s
     }
