@@ -48,9 +48,6 @@ pub enum SoftError {
     /// The value provided to the `set` command could not be parsed.
     BadSetVal(String),
 
-    /// The input contained a decimal point, but was not in the decimal radix.
-    NonDecFloat,
-
     /// Eex input (input after the `e` in e-notation) was too large to raise an `f64` to the power of.
     BigEex,
 
@@ -83,8 +80,7 @@ impl Display for SoftError {
             Self::GuacCmdExtraArg => write!(f, "E13: too many cmd args"),
             Self::BadSetPath(p) => write!(f, "E14: no such setting \"{p}\"",),
             Self::BadSetVal(v) => write!(f, "E15: couldnt parse \"{v}\"",),
-            Self::NonDecFloat => write!(f, "E16: non-decimal fractional input"),
-            Self::BigEex => write!(f, "E17: eex too big"),
+            Self::BigEex => write!(f, "E16: eex too big"),
             #[cfg(debug_assertions)]
             Self::Debug(s) => write!(f, "DEBUG: {s}"),
         }
