@@ -39,7 +39,7 @@ use crossterm::{
     ExecutableCommand, QueueableCommand,
 };
 
-use num::{traits::Pow, BigRational, FromPrimitive};
+use num::{traits::Pow, BigInt, BigRational};
 
 /// Provides the `Expr` type and various methods for working with it
 pub mod expr;
@@ -205,6 +205,11 @@ impl<'a> State<'a> {
         self.select_idx.or_else(|| self.stack.len().checked_sub(1))
     }
 
+    #[inline]
+    fn input_radix(&self) -> Radix {
+        self.input_radix.unwrap_or(self.config.radix)
+    }
+
     fn render(&mut self) -> Result<(), Error> {
         let (_, cy) = cursor::position().context("couldn't get cursor pos")?;
         self.stdout
@@ -345,24 +350,29 @@ impl<'a> State<'a> {
     }
 
     fn parse_exact_expr(&self, s: &str) -> Result<Expr<BigRational>, SoftError> {
-        self.input_radix
-            .unwrap_or(self.config.radix)
+        self.input_radix()
             .parse_bigint(s)
             .map(|n| Expr::Num(BigRational::from(n)))
             .ok_or(SoftError::BadInput)
     }
 
-    // TODO: maunally parsing non-dec floats seems easy enough
     fn parse_approx_expr(&self, s: &str) -> Result<Expr<BigRational>, SoftError> {
-        if self.input_radix.unwrap_or(self.config.radix) == Radix::DECIMAL {
-            s.parse::<f64>()
-                .ok()
-                .and_then(BigRational::from_f64)
-                .ok_or(SoftError::BadInput)
-                .map(Expr::Num)
-        } else {
-            Err(SoftError::NonDecFloat)
-        }
+        let (int_str, frac_str) = s.split_once('.').ok_or(SoftError::BadInput)?;
+
+        let int_part = self
+            .input_radix()
+            .parse_bigint(int_str)
+            .ok_or(SoftError::BadInput)?;
+
+        let frac_part = self
+            .input_radix()
+            .parse_bigint(frac_str)
+            .ok_or(SoftError::BadInput)?;
+
+        let denom = BigInt::from(self.input_radix().inner()).pow(frac_str.len());
+        Ok(Expr::Num(
+            BigRational::from(int_part) + BigRational::new(frac_part, denom),
+        ))
     }
 
     fn parse_expr(&self, s: &str) -> Result<(DisplayMode, Expr<BigRational>), SoftError> {
@@ -395,7 +405,7 @@ impl<'a> State<'a> {
             return Ok(None);
         }
 
-        let radix = self.input_radix.unwrap_or(self.config.radix);
+        let radix = self.input_radix();
 
         let eex = self
             .eex_input
@@ -421,9 +431,8 @@ impl<'a> State<'a> {
 
     fn push_var(&mut self) {
         if !self.input.is_empty() {
-            let radix = self.input_radix.unwrap_or(self.config.radix);
             let input = mem::take(&mut self.input);
-            self.push_expr(Expr::Var(input), radix, DisplayMode::Exact);
+            self.push_expr(Expr::Var(input), self.input_radix(), DisplayMode::Exact);
         }
     }
 

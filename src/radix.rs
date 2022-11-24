@@ -1,17 +1,14 @@
 use crate::{config::Config, expr::Expr};
 
-use std::{
-    fmt::Display,
-    ops::{Deref, Neg},
-    str::FromStr,
-};
+use std::{fmt::Display, ops::Deref, str::FromStr};
 
 use num::{bigint::Sign, BigInt, BigRational, One, Signed};
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 
-/// A list of Misalian radix abbreviations. The `b-2`th element contains the abbreviation for base `b`.
+/// A list of Misalian radix abbreviations. The `b-2`th element contains the abbreviation for
+/// base `b`.
 pub const ABBVS: [&str; 63] = [
     "bin", "tri", "qua", "qui", "sex", "sep", "oct", "non", "dec", "ele", "doz", "bak", "bis",
     "trq", "hex", "sub", "trs", "unt", "vig", "tis", "bie", "unb", "tet", "pen", "bik", "trn",
@@ -32,10 +29,7 @@ pub const DIGITS: [char; 64] = [
 // TODO: make this a NonZeroUsize
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[cfg_attr(test, derive(Arbitrary))]
-pub struct Radix(
-    #[cfg_attr(test, proptest(strategy = "2..=64usize"))]
-    usize
-);
+pub struct Radix(#[cfg_attr(test, proptest(strategy = "2..=64usize"))] usize);
 
 impl Radix {
     /// bin / 2: base dec#2
@@ -89,6 +83,7 @@ impl Radix {
     }
 
     /// Attempt to parse a digit into an integer in this radix.
+    // TODO: this probably shouldn't be generic
     #[must_use]
     pub fn parse_digit<T>(&self, digit: &char) -> Option<T>
     where
@@ -122,12 +117,12 @@ impl Radix {
         }
 
         let buf: Option<Vec<u8>> = chars.map(|c| self.parse_digit::<u8>(&c)).collect();
-        let res = BigInt::from_radix_be(Sign::Plus, &buf?, self.0 as u32);
-        if negative {
-            res.map(Neg::neg)
-        } else {
-            res
-        }
+
+        BigInt::from_radix_be(
+            if negative { Sign::Minus } else { Sign::Plus },
+            &buf?,
+            self.0 as u32,
+        )
     }
 
     /// Getter for `self.0`. Returns the inner number of this radix.
