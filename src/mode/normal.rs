@@ -14,6 +14,12 @@ use num::{
     One, Signed, Zero,
 };
 
+#[inline]
+const fn const_none1<T, R>(_: &T) -> Option<R> { None }
+
+#[inline]
+const fn const_none2<T, U, R>(_: &T, _: &U) -> Option<R> { None }
+
 impl<'a> State<'a> {
     /// Process a keypress in normal mode.
     pub fn normal_mode(
@@ -96,7 +102,7 @@ impl<'a> State<'a> {
             KeyCode::Char('a') => {
                 self.select_idx = None;
             }
-            KeyCode::Char('+') => self.apply_binary(|x, y| x + y, |_, _| None)?,
+            KeyCode::Char('+') => self.apply_binary(&|x, y| x + y, &const_none2)?,
             KeyCode::Char('-') => {
                 if let Some(s) = &mut self.eex_input {
                     if s.starts_with('-') {
@@ -105,15 +111,15 @@ impl<'a> State<'a> {
                         s.insert(0, '-');
                     }
                 } else {
-                    self.apply_binary(|x, y| x - y, |_, _| None)?;
+                    self.apply_binary(&|x, y| x - y, &const_none2)?;
                 }
             }
-            KeyCode::Char('*') => self.apply_binary(|x, y| x * y, |_, _| None)?,
+            KeyCode::Char('*') => self.apply_binary(&|x, y| x * y, &const_none2)?,
             KeyCode::Char('/') => self.apply_binary(
-                |x, y| x / y,
-                |_, y| y.is_zero().then_some(SoftError::DivideByZero),
+                &|x, y| x / y,
+                &|_, y| y.is_zero().then_some(SoftError::DivideByZero),
             )?,
-            KeyCode::Char('^') => self.apply_binary(Pow::pow, |x, y| {
+            KeyCode::Char('^') => self.apply_binary(&Pow::pow, &|x, y| {
                 if x.is_zero() && y.is_negative() {
                     Some(SoftError::DivideByZero)
                 } else if x.is_negative() && *y < Expr::one() {
@@ -122,34 +128,34 @@ impl<'a> State<'a> {
                     None
                 }
             })?,
-            KeyCode::Char('g') => self.apply_unary(|x| x.log(Expr::Const(Const::E)), |_| None)?,
+            KeyCode::Char('g') => self.apply_unary(&|x| x.log(Expr::Const(Const::E)), &const_none1)?,
             KeyCode::Char('%') => self.apply_binary(
-                |x, y| x % y,
-                |_, y| y.is_zero().then_some(SoftError::DivideByZero),
+                &|x, y| x % y,
+                &|_, y| y.is_zero().then_some(SoftError::DivideByZero),
             )?,
             KeyCode::Char('r') => {
-                self.apply_unary(Expr::sqrt, |x| {
+                self.apply_unary(&Expr::sqrt, &|x| {
                     x.is_negative().then_some(SoftError::Complex)
                 })?;
             }
             KeyCode::Char('`') => {
-                self.apply_unary(Inv::inv, |x| x.is_zero().then_some(SoftError::DivideByZero))?;
+                self.apply_unary(&Inv::inv, &|x| x.is_zero().then_some(SoftError::DivideByZero))?;
             }
-            KeyCode::Char('~') => self.apply_unary(Neg::neg, |_| None)?,
-            KeyCode::Char('\\') => self.apply_unary(|x| x.abs(), |_| None)?,
+            KeyCode::Char('~') => self.apply_unary(&Neg::neg, &const_none1)?,
+            KeyCode::Char('\\') => self.apply_unary(&|x| x.abs(), &const_none1)?,
             KeyCode::Char('s') => {
                 let angle_measure = self.config.angle_measure;
-                self.apply_unary(|x| x.generic_sin(angle_measure), |_| None)?;
+                self.apply_unary(&|x| x.generic_sin(angle_measure), &const_none1)?;
             }
             KeyCode::Char('c') => {
                 let angle_measure = self.config.angle_measure;
-                self.apply_unary(|x| x.generic_cos(angle_measure), |_| None)?;
+                self.apply_unary(&|x| x.generic_cos(angle_measure), &const_none1)?;
             }
             KeyCode::Char('t') => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(
-                    |x| x.generic_tan(angle_measure),
-                    |x| {
+                    &|x| x.generic_tan(angle_measure),
+                    &|x| {
                         (x.clone().into_turns(angle_measure) % Expr::from((1, 2))
                             == Expr::from((1, 4)))
                         .then_some(SoftError::BadTan)
@@ -159,8 +165,8 @@ impl<'a> State<'a> {
             KeyCode::Char('S') => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(
-                    |x| x.asin(angle_measure),
-                    |x| {
+                    &|x| x.asin(angle_measure),
+                    &|x| {
                         (!x.contains_var() && (x >= &Expr::one() || x <= &Expr::one().neg()))
                             .then_some(SoftError::Complex)
                     },
@@ -169,8 +175,8 @@ impl<'a> State<'a> {
             KeyCode::Char('C') => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(
-                    |x| x.acos(angle_measure),
-                    |x| {
+                    &|x| x.acos(angle_measure),
+                    &|x| {
                         (!x.contains_var() && (x <= &Expr::one() || x >= &Expr::one().neg()))
                             .then_some(SoftError::Complex)
                     },
@@ -178,7 +184,7 @@ impl<'a> State<'a> {
             }
             KeyCode::Char('T') => {
                 let angle_measure = self.config.angle_measure;
-                self.apply_unary(|x| x.atan(angle_measure), |_| None)?;
+                self.apply_unary(&|x| x.atan(angle_measure), &const_none1)?;
             }
             KeyCode::Char('[') => self.toggle_debug(),
             #[cfg(debug_assertions)]
@@ -241,10 +247,10 @@ impl<'a> State<'a> {
                 }
             }
             KeyCode::Char('G') => self.apply_binary(
-                |x, y| y.log(x),
-                |_, y| y.is_negative().then_some(SoftError::BadLog),
+                &|x, y| y.log(x),
+                &|_, y| y.is_negative().then_some(SoftError::BadLog),
             )?,
-            KeyCode::Char('R') => self.apply_unary(|x| x.pow(2.into()), |_| None)?,
+            KeyCode::Char('R') => self.apply_unary(&|x| x.pow(2.into()), &const_none1)?,
             KeyCode::Char(c)
                 if !escape_digits
                     && self.select_idx.is_none()

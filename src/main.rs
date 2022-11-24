@@ -339,7 +339,7 @@ impl<'a> State<'a> {
         self.stack
             .insert(self.select_idx.unwrap_or(self.stack.len()), stack_item);
 
-        if let Some(i) = &mut self.select_idx {
+        if let Some(ref mut i) = self.select_idx {
             *i += 1;
         }
     }
@@ -441,11 +441,11 @@ impl<'a> State<'a> {
         }
     }
 
-    // TODO: add an apply_binary_always function? would be useful if it could just return ().
+    #[allow(clippy::type_complexity)] // it's not *that* bad.
     fn apply_binary(
         &mut self,
-        f: impl Fn(Expr<BigRational>, Expr<BigRational>) -> Expr<BigRational>,
-        are_in_domain: impl Fn(&Expr<BigRational>, &Expr<BigRational>) -> Option<SoftError>,
+        f: &dyn Fn(Expr<BigRational>, Expr<BigRational>) -> Expr<BigRational>,
+        check_domain: &dyn Fn(&Expr<BigRational>, &Expr<BigRational>) -> Option<SoftError>,
     ) -> Result<(), SoftError> {
         let prev_input = if self.select_idx.is_none() {
             self.push_input()?
@@ -457,9 +457,9 @@ impl<'a> State<'a> {
             return Ok(());
         }
 
-        let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
+        let idx = self.select_idx().unwrap();
 
-        if let Some(e) = are_in_domain(&self.stack[idx - 1].expr, &self.stack[idx].expr) {
+        if let Some(e) = check_domain(&self.stack[idx - 1].expr, &self.stack[idx].expr) {
             if let Some(prev_input) = prev_input {
                 self.stack.pop();
                 self.input = prev_input;
@@ -468,13 +468,15 @@ impl<'a> State<'a> {
             return Err(e);
         }
 
+        // expr0 expr1 expr2 expr3
+        //       ^^^^^ ^^^^^
+        //       |     | y <- idx
+        //       | x <- idx - 1
         let x = self.stack.remove(idx - 1);
         let y = self.stack.remove(idx - 1);
 
         let display_mode = DisplayMode::combine(x.display_mode, y.display_mode);
 
-        // TODO: is this equivalent to `self.push_stack_item(..)`?
-        // TODO: combine their debugness as well
         let item = StackItem::new(
             f(x.expr, y.expr),
             x.radix,
@@ -483,9 +485,12 @@ impl<'a> State<'a> {
             x.debug || y.debug,
         );
 
+        // expr0 expr4 expr3
+        //       ^^^^^
+        //       | idx - 1
         self.stack.insert(idx - 1, item);
 
-        if let Some(i) = self.select_idx.as_mut() {
+        if let Some(ref mut i) = self.select_idx {
             *i -= 1;
         }
 
@@ -494,9 +499,8 @@ impl<'a> State<'a> {
 
     fn apply_unary(
         &mut self,
-        f: impl Fn(Expr<BigRational>) -> Expr<BigRational>,
-        // TODO: rename these arguments
-        is_in_domain: impl Fn(&Expr<BigRational>) -> Option<SoftError>,
+        f: &dyn Fn(Expr<BigRational>) -> Expr<BigRational>,
+        check_domain: &dyn Fn(&Expr<BigRational>) -> Option<SoftError>,
     ) -> Result<(), SoftError> {
         let prev_input = if self.select_idx.is_none() {
             self.push_input()?
@@ -510,7 +514,7 @@ impl<'a> State<'a> {
 
         let idx = self.select_idx.unwrap_or(self.stack.len() - 1);
 
-        if let Some(e) = is_in_domain(&self.stack[idx].expr) {
+        if let Some(e) = check_domain(&self.stack[idx].expr) {
             if let Some(prev_input) = prev_input {
                 self.stack.pop();
                 self.input = prev_input;
