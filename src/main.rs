@@ -22,7 +22,7 @@ use crate::{
 
 use std::{
     fmt::{Display, Write},
-    io::{stdin, stdout, BufRead, BufReader, StdoutLock, Write as _},
+    io::{BufRead, BufReader, StdoutLock, Write as _, self},
     mem,
     process::exit,
 };
@@ -200,9 +200,16 @@ impl<'a> State<'a> {
     }
 
     /// Return the index of the selected item, or the last item if none are selected.
-    // TODO: see if i can replace this with a `Fn(&self) -> Option<[&[mut ]]Expr>` family
-    fn selected_or_last_idx(&self) -> Option<usize> {
+    fn select_idx(&self) -> Option<usize> {
         self.select_idx.or_else(|| self.stack.len().checked_sub(1))
+    }
+
+    fn selected_item_mut(&mut self) -> Option<&mut StackItem> {
+        if let Some(i) = self.select_idx {
+            self.stack.get_mut(i)
+        } else {
+            self.stack.last_mut()
+        }
     }
 
     #[inline]
@@ -390,11 +397,9 @@ impl<'a> State<'a> {
             // pressing `enter` when the input looks like `hex#` should alter the radix of the top
             // or selected stack item
             if self.input_radix.is_some() {
-                if let Some(i) = self.selected_or_last_idx() {
-                    if let Some(x) = self.stack.get_mut(i) {
-                        x.radix = self.input_radix.unwrap_or(self.config.radix);
-                        x.rerender(&self.config);
-                    }
+                if let Some(idx) = self.select_idx() {
+                    self.stack[idx].radix = self.input_radix.unwrap_or(self.config.radix);
+                    self.stack[idx].rerender(&self.config);
 
                     self.input_radix = None;
                     self.radix_input = None;
@@ -533,31 +538,27 @@ impl<'a> State<'a> {
     }
 
     fn swap(&mut self) {
-        if let Some(idx) = self.selected_or_last_idx() {
-            if idx > 0 {
-                self.stack.swap(idx - 1, idx);
-            }
+        let Some(idx) = self.select_idx() else { return; };
+        if idx > 0 {
+            self.stack.swap(idx - 1, idx);
         }
     }
 
     fn toggle_approx(&mut self) {
-        if let Some(idx) = self.selected_or_last_idx() {
-            let m = &mut self.stack[idx].display_mode;
-            match m {
-                DisplayMode::Approx => *m = DisplayMode::Exact,
-                DisplayMode::Exact => *m = DisplayMode::Approx,
-            }
+        let Some(item) = self.selected_item_mut() else { return; };
+        match &mut item.display_mode {
+            m @ DisplayMode::Approx => *m = DisplayMode::Exact,
+            m @ DisplayMode::Exact => *m = DisplayMode::Approx,
         }
     }
 
     fn toggle_debug(&mut self) {
-        if let Some(idx) = self.selected_or_last_idx() {
-            self.stack[idx].debug = !self.stack[idx].debug;
-        }
+        let Some(item) = self.selected_item_mut() else { return; };
+        item.debug = !item.debug;
     }
 
     fn init_from_stdin(&mut self) {
-        let stdin = stdin();
+        let stdin = io::stdin();
 
         if stdin.is_tty() {
             return;
@@ -673,9 +674,10 @@ impl<'a> State<'a> {
 }
 
 #[allow(unused_must_use)]
-/// Try our best to clean up the terminal state; if too many errors happen, just print some newlines and call it good.
+/// Try our best to clean up the terminal state; if too many errors happen, just print some
+/// newlines and call it good.
 fn cleanup() {
-    let stdout = stdout();
+    let stdout = io::stdout();
     let mut stdout = stdout.lock();
     if stdout.is_tty() {
         stdout.execute(cursor::Show);
@@ -689,7 +691,7 @@ fn cleanup() {
 }
 
 fn guac_interactive(force: bool) -> Result<(), Error> {
-    let stdout = stdout();
+    let stdout = io::stdout();
     let stdout = stdout.lock();
 
     if !force {
