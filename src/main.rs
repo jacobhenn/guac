@@ -376,7 +376,7 @@ impl<'a> State<'a> {
             .parse_bigint(frac_str)
             .ok_or(SoftError::BadInput)?;
 
-        let denom = BigInt::from(self.input_radix().inner()).pow(frac_str.len());
+        let denom = BigInt::from(self.input_radix().get()).pow(frac_str.len());
         Ok(Expr::Num(
             BigRational::from(int_part) + BigRational::new(frac_part, denom),
         ))
