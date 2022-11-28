@@ -1,4 +1,4 @@
-use std::{io, fmt::Display};
+use std::{io, fmt::Display, borrow::Cow};
 
 /// A representation of an error on the user's end.
 #[allow(clippy::module_name_repetitions)]
@@ -56,6 +56,14 @@ pub enum SoftError {
     Debug(String),
 }
 
+fn strclamp(s: &str, len: usize) -> Cow<str> {
+    if s.len() <= len {
+        Cow::Borrowed(s)
+    } else {
+        Cow::Owned(format!("{}…", s.chars().take(len).collect::<String>()))
+    }
+}
+
 impl Display for SoftError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -73,13 +81,13 @@ impl Display for SoftError {
                     write!(f, "E08: bad command: {e}")
                 }
             }
-            Self::SysCmdFailed(s, e) => write!(f, "E09: {s}: {e}"),
+            Self::SysCmdFailed(s, e) => write!(f, "E09: {}: {}", strclamp(s, 18), strclamp(e, 24)),
             Self::SysCmdIoErr(e) => write!(f, "E10: cmd io err: {e}"),
             Self::UnknownGuacCmd(s) => write!(f, "E11: unknown cmd {s}"),
             Self::GuacCmdMissingArg => write!(f, "E12: cmd missing arg"),
             Self::GuacCmdExtraArg => write!(f, "E13: too many cmd args"),
-            Self::BadSetPath(p) => write!(f, "E14: no such setting \"{p}\"",),
-            Self::BadSetVal(v) => write!(f, "E15: couldnt parse \"{v}\"",),
+            Self::BadSetPath(p) => write!(f, "E14: no such setting \"{}\"", strclamp(p, 18)),
+            Self::BadSetVal(v) => write!(f, "E15: couldnt parse \"{}\"", strclamp(v, 18)),
             Self::BigEex => write!(f, "E16: eex too big"),
             #[cfg(debug_assertions)]
             Self::Debug(s) => write!(f, "DEBUG: {s}"),

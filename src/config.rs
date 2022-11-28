@@ -21,6 +21,9 @@ pub struct Config {
 
     /// The "default" radix in which numbers will be inputted or displayed.
     pub radix: Radix,
+
+    /// The number of digits to display after the decimal point of approximate numbers.
+    pub precision: usize,
 }
 
 impl Default for Config {
@@ -28,6 +31,7 @@ impl Default for Config {
         Self {
             angle_measure: AngleMeasure::Radian,
             radix: Radix::DECIMAL,
+            precision: 3,
         }
     }
 }

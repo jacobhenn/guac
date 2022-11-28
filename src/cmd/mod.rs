@@ -1,4 +1,4 @@
-use crate::{SoftError, State};
+use crate::{SoftError, State, radix::Radix};
 
 impl<'a> State<'a> {
     /// Process the words after "set" and modify the state.
@@ -6,36 +6,29 @@ impl<'a> State<'a> {
     where
         I: Iterator<Item = String>,
     {
-        match words.next() {
-            Some(p) if &p == "angle_measure" => {
-                if let Some(arg) = words.next() {
-                    if let Ok(angle_measure) = arg.parse() {
-                        self.config.angle_measure = angle_measure;
-                    } else {
-                        return Err(SoftError::BadSetVal(arg));
-                    }
-                } else {
-                    return Err(SoftError::GuacCmdMissingArg);
+        match words.next().ok_or(SoftError::GuacCmdMissingArg)?.as_str() {
+            "angle_measure" => {
+                let arg = words.next().ok_or(SoftError::GuacCmdExtraArg)?;
+                let angle_measure = arg.parse().map_err(|_| SoftError::BadSetVal(arg))?;
+                self.config.angle_measure = angle_measure;
+            }
+            "radix" => {
+                let arg = words.next().ok_or(SoftError::GuacCmdMissingArg)?;
+                let radix = arg.parse::<Radix>().map_err(|_| SoftError::BadSetVal(arg))?;
+                self.config.radix = radix;
+                for stack_item in &mut self.stack {
+                    stack_item.rerender(&self.config);
                 }
             }
-            Some(p) if &p == "radix" => {
-                if let Some(arg) = words.next() {
-                    if let Ok(radix) = arg.parse() {
-                        self.config.radix = radix;
-                        for stack_item in &mut self.stack {
-                            stack_item.rerender(&self.config);
-                        }
-                    } else {
-                        return Err(SoftError::BadSetVal(arg));
-                    }
+            "precision" => {
+                let arg = words.next().ok_or(SoftError::GuacCmdMissingArg)?;
+                let precision = arg.parse::<usize>().map_err(|_| SoftError::BadSetVal(arg))?;
+                self.config.precision = precision;
+                for stack_item in &mut self.stack {
+                    stack_item.rerender(&self.config);
                 }
             }
-            Some(p) => {
-                return Err(SoftError::BadSetPath(p));
-            }
-            None => {
-                return Err(SoftError::GuacCmdMissingArg);
-            }
+            other => return Err(SoftError::BadSetPath(other.to_string())),
         }
 
         Ok(())

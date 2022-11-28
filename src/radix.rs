@@ -138,9 +138,7 @@ impl Radix {
             chars.next();
         }
 
-        let buf: Option<Vec<u8>> = chars
-            .map(|c| self.parse_digit(&c))
-            .collect();
+        let buf: Option<Vec<u8>> = chars.map(|c| self.parse_digit(&c)).collect();
 
         BigInt::from_radix_be(
             if negative { Sign::Minus } else { Sign::Plus },
@@ -199,7 +197,7 @@ impl Display for Radix {
 /// Types which can be displayed given the surrounding context of a radix and a configuration.
 /// If we had `with` clauses, this could probably be replaced by
 /// `fmt::Display with(Radix, &Config)`
-// TODO: make these write to a buffer instead of returning new strings
+// TODO: (lo-priority) make these write to a buffer instead of returning new strings
 pub trait DisplayWithContext {
     /// Returns what prefix should be put in front of this number when displaying in the given
     /// context. For example, `prefix(Radix::DECIMAL, config)` will return an empty string if
@@ -276,11 +274,26 @@ impl DisplayWithContext for f64 {
         }
     }
 
-    fn display_impl(&self, _: Radix, _: &Config) -> String {
+    fn display_impl(&self, _: Radix, config: &Config) -> String {
         if *self >= 1e6 || *self <= 1e-4 {
-            format!("{self:.3e}")
+            format!("{self:.0$e}", config.precision)
         } else {
-            format!("{self:.3}")
+            format!("{self:.0$}", config.precision)
         }
     }
+}
+
+#[test]
+fn test_display_f64() {
+    assert_eq!(
+        4.5f64.display_in(
+            Radix::DECIMAL,
+            &Config {
+                radix: Radix::BINARY,
+                precision: 6,
+                ..Config::default()
+            }
+        ),
+        "dec#4.500000"
+    );
 }
