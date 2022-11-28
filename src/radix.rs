@@ -109,17 +109,13 @@ impl Radix {
     }
 
     /// Attempt to parse a digit into an integer in this radix.
-    // TODO: this probably shouldn't be generic
     #[must_use]
-    pub fn parse_digit<T>(&self, digit: &char) -> Option<T>
-    where
-        T: TryFrom<usize>,
-    {
+    pub fn parse_digit(&self, digit: &char) -> Option<u8> {
         let unchecked_digit: usize = DIGITS.iter().position(|c| c == digit)?;
         if unchecked_digit >= self.get() {
             None
         } else {
-            Some(unchecked_digit.try_into().ok()?)
+            Some(unchecked_digit as u8)
         }
     }
 
@@ -142,7 +138,9 @@ impl Radix {
             chars.next();
         }
 
-        let buf: Option<Vec<u8>> = chars.map(|c| self.parse_digit::<u8>(&c)).collect();
+        let buf: Option<Vec<u8>> = chars
+            .map(|c| self.parse_digit(&c))
+            .collect();
 
         BigInt::from_radix_be(
             if negative { Sign::Minus } else { Sign::Plus },
@@ -201,6 +199,7 @@ impl Display for Radix {
 /// Types which can be displayed given the surrounding context of a radix and a configuration.
 /// If we had `with` clauses, this could probably be replaced by
 /// `fmt::Display with(Radix, &Config)`
+// TODO: make these write to a buffer instead of returning new strings
 pub trait DisplayWithContext {
     /// Returns what prefix should be put in front of this number when displaying in the given
     /// context. For example, `prefix(Radix::DECIMAL, config)` will return an empty string if

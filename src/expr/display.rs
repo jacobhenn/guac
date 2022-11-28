@@ -263,7 +263,6 @@ impl<'a> DefaultFormatter<'a> {
     }
 }
 
-// TODO: put these impl items in proper order
 impl<'a, N> ExprFormatter<N> for DefaultFormatter<'a>
 where
     N: Signed + DisplayWithContext,
@@ -275,6 +274,17 @@ where
     #[inline]
     fn get_buf(&mut self) -> &mut dyn fmt::Write {
         self.buf
+    }
+
+    fn fmt_in_parens(&mut self, inner: impl Formattable<N, Self>) -> Result<(), Self::Error>
+    where
+        Expr<N>: Signed,
+        N: DisplayWithContext,
+    {
+        self.buf.write_char('(')?; // :)
+        inner.fmt_to(self)?;
+        self.buf.write_char(')')?;
+        Ok(())
     }
 
     fn fmt_fn_call(
@@ -294,6 +304,21 @@ where
         N: DisplayWithContext,
     {
         write!(self.buf, "{}", num.display_in(self.radix, self.config))
+    }
+
+    fn write_product_separator(&mut self) -> Result<(), Self::Error> {
+        self.buf.write_char('·')
+    }
+
+    fn fmt_frac(
+        &mut self,
+        numer: impl Iterator<Item = impl Formattable<N, Self>>,
+        denom: impl Iterator<Item = impl Formattable<N, Self>>,
+    ) -> Result<(), Self::Error> {
+        self.fmt_frac_component(numer)?;
+        self.buf.write_char('/')?;
+        self.fmt_frac_component(denom)?;
+        Ok(())
     }
 
     fn fmt_power(&mut self, base: &Expr<N>, exp: &Expr<N>) -> Result<(), Self::Error> {
@@ -364,32 +389,6 @@ where
         })?;
 
         Ok(())
-    }
-
-    fn fmt_in_parens(&mut self, inner: impl Formattable<N, Self>) -> Result<(), Self::Error>
-    where
-        Expr<N>: Signed,
-        N: DisplayWithContext,
-    {
-        self.buf.write_char('(')?; // :)
-        inner.fmt_to(self)?;
-        self.buf.write_char(')')?;
-        Ok(())
-    }
-
-    fn fmt_frac(
-        &mut self,
-        numer: impl Iterator<Item = impl Formattable<N, Self>>,
-        denom: impl Iterator<Item = impl Formattable<N, Self>>,
-    ) -> Result<(), Self::Error> {
-        self.fmt_frac_component(numer)?;
-        self.buf.write_char('/')?;
-        self.fmt_frac_component(denom)?;
-        Ok(())
-    }
-
-    fn write_product_separator(&mut self) -> Result<(), Self::Error> {
-        self.buf.write_char('·')
     }
 }
 
