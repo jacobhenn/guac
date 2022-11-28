@@ -1,6 +1,6 @@
 [package]
 name = "guac"
-version = "0.2.0-4"
+version = "0.2.0"
 authors = ["Jacob Henn <windowWeasel@outlook.com>"]
 edition = "2021"
 license = "Unlicense"
