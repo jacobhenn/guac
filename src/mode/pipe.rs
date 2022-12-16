@@ -69,7 +69,7 @@ impl<'a> State<'a> {
             KeyCode::Char(c) => self.input.push(c),
             KeyCode::Enter => {
                 self.execute_pipe().map_err(SoftError::SysCmdIoErr)??;
-                self.input = String::new();
+                self.input.clear();
                 self.mode = Mode::Normal;
             }
             KeyCode::Backspace => {
@@ -80,7 +80,7 @@ impl<'a> State<'a> {
                 }
             }
             KeyCode::Esc => {
-                self.input = String::new();
+                self.input.clear();
                 self.mode = Mode::Normal;
             }
             _ => (),

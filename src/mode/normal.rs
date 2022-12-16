@@ -7,6 +7,8 @@ use crate::{
 
 use std::ops::Neg;
 
+use arboard::Clipboard;
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use num::{
@@ -15,10 +17,14 @@ use num::{
 };
 
 #[inline]
-const fn const_none1<T, R>(_: &T) -> Option<R> { None }
+const fn const_none1<T, R>(_: &T) -> Option<R> {
+    None
+}
 
 #[inline]
-const fn const_none2<T, U, R>(_: &T, _: &U) -> Option<R> { None }
+const fn const_none2<T, U, R>(_: &T, _: &U) -> Option<R> {
+    None
+}
 
 impl<'a> State<'a> {
     /// Process a keypress in normal mode.
@@ -115,10 +121,9 @@ impl<'a> State<'a> {
                 }
             }
             KeyCode::Char('*') => self.apply_binary(&|x, y| x * y, &const_none2)?,
-            KeyCode::Char('/') => self.apply_binary(
-                &|x, y| x / y,
-                &|_, y| y.is_zero().then_some(SoftError::DivideByZero),
-            )?,
+            KeyCode::Char('/') => self.apply_binary(&|x, y| x / y, &|_, y| {
+                y.is_zero().then_some(SoftError::DivideByZero)
+            })?,
             KeyCode::Char('^') => self.apply_binary(&Pow::pow, &|x, y| {
                 if x.is_zero() && y.is_negative() {
                     Some(SoftError::DivideByZero)
@@ -128,18 +133,21 @@ impl<'a> State<'a> {
                     None
                 }
             })?,
-            KeyCode::Char('g') => self.apply_unary(&|x| x.log(Expr::Const(Const::E)), &const_none1)?,
-            KeyCode::Char('%') => self.apply_binary(
-                &|x, y| x % y,
-                &|_, y| y.is_zero().then_some(SoftError::DivideByZero),
-            )?,
+            KeyCode::Char('g') => {
+                self.apply_unary(&|x| x.log(Expr::Const(Const::E)), &const_none1)?
+            }
+            KeyCode::Char('%') => self.apply_binary(&|x, y| x % y, &|_, y| {
+                y.is_zero().then_some(SoftError::DivideByZero)
+            })?,
             KeyCode::Char('r') => {
                 self.apply_unary(&Expr::sqrt, &|x| {
                     x.is_negative().then_some(SoftError::Complex)
                 })?;
             }
             KeyCode::Char('`') => {
-                self.apply_unary(&Inv::inv, &|x| x.is_zero().then_some(SoftError::DivideByZero))?;
+                self.apply_unary(&Inv::inv, &|x| {
+                    x.is_zero().then_some(SoftError::DivideByZero)
+                })?;
             }
             KeyCode::Char('~') => self.apply_unary(&Neg::neg, &const_none1)?,
             KeyCode::Char('\\') => self.apply_unary(&|x| x.abs(), &const_none1)?,
@@ -153,34 +161,24 @@ impl<'a> State<'a> {
             }
             KeyCode::Char('t') => {
                 let angle_measure = self.config.angle_measure;
-                self.apply_unary(
-                    &|x| x.generic_tan(angle_measure),
-                    &|x| {
-                        (x.clone().into_turns(angle_measure) % Expr::from((1, 2))
-                            == Expr::from((1, 4)))
+                self.apply_unary(&|x| x.generic_tan(angle_measure), &|x| {
+                    (x.clone().into_turns(angle_measure) % Expr::from((1, 2)) == Expr::from((1, 4)))
                         .then_some(SoftError::BadTan)
-                    },
-                )?;
+                })?;
             }
             KeyCode::Char('S') => {
                 let angle_measure = self.config.angle_measure;
-                self.apply_unary(
-                    &|x| x.asin(angle_measure),
-                    &|x| {
-                        (!x.contains_var() && (x >= &Expr::one() || x <= &Expr::one().neg()))
-                            .then_some(SoftError::Complex)
-                    },
-                )?;
+                self.apply_unary(&|x| x.asin(angle_measure), &|x| {
+                    (!x.contains_var() && (x >= &Expr::one() || x <= &Expr::one().neg()))
+                        .then_some(SoftError::Complex)
+                })?;
             }
             KeyCode::Char('C') => {
                 let angle_measure = self.config.angle_measure;
-                self.apply_unary(
-                    &|x| x.acos(angle_measure),
-                    &|x| {
-                        (!x.contains_var() && (x <= &Expr::one() || x >= &Expr::one().neg()))
-                            .then_some(SoftError::Complex)
-                    },
-                )?;
+                self.apply_unary(&|x| x.acos(angle_measure), &|x| {
+                    (!x.contains_var() && (x <= &Expr::one() || x >= &Expr::one().neg()))
+                        .then_some(SoftError::Complex)
+                })?;
             }
             KeyCode::Char('T') => {
                 let angle_measure = self.config.angle_measure;
@@ -200,7 +198,7 @@ impl<'a> State<'a> {
             }
             KeyCode::Char('k') => self.mode = Mode::Constant,
             KeyCode::Char('v') => {
-                self.input = String::new();
+                self.input.clear();
                 self.eex_input = None;
                 self.select_idx = None;
                 self.mode = Mode::Variable;
@@ -209,14 +207,14 @@ impl<'a> State<'a> {
                 self.push_input()?;
                 if !self.stack.is_empty() {
                     self.err = None;
-                    self.input = String::new();
+                    self.input.clear();
                     self.mode = Mode::Pipe;
                 }
             }
             KeyCode::Char(':') => {
                 self.push_input()?;
                 self.err = None;
-                self.input = String::new();
+                self.input.clear();
                 self.mode = Mode::Cmd;
             }
             KeyCode::Char('i') => self.mode = Mode::Insert,
@@ -227,6 +225,13 @@ impl<'a> State<'a> {
             }
             KeyCode::Char('u') => return Ok(Status::Undo),
             KeyCode::Char('U') => return Ok(Status::Redo),
+            KeyCode::Char('y') => {
+                let Some(e) = self.stack.last() else { return Ok(Status::Render) };
+                let mut clipboard = Clipboard::new().map_err(|_| SoftError::Clipboard)?;
+                clipboard
+                    .set_text(e.display_latex(&self.config))
+                    .map_err(|_| SoftError::Clipboard)?;
+            }
             KeyCode::Char('<') => {
                 if let Some(i) = &mut self.select_idx {
                     if *i != 0 {
@@ -246,10 +251,9 @@ impl<'a> State<'a> {
                     }
                 }
             }
-            KeyCode::Char('G') => self.apply_binary(
-                &|x, y| y.log(x),
-                &|_, y| y.is_negative().then_some(SoftError::BadLog),
-            )?,
+            KeyCode::Char('G') => self.apply_binary(&|x, y| y.log(x), &|_, y| {
+                y.is_negative().then_some(SoftError::BadLog)
+            })?,
             KeyCode::Char('R') => self.apply_unary(&|x| x.pow(2.into()), &const_none1)?,
             KeyCode::Char(c)
                 if !escape_digits

@@ -21,7 +21,7 @@ impl<'a> State<'a> {
                 self.reset_mode();
             }
             KeyCode::Esc => {
-                self.input = String::new();
+                self.input.clear();
                 self.reset_mode();
             }
             _ => (),

@@ -22,7 +22,7 @@ use crate::{
 
 use std::{
     fmt::{Display, Write},
-    io::{BufRead, BufReader, StdoutLock, Write as _, self},
+    io::{self, BufRead, BufReader, StdoutLock, Write as _},
     mem,
     process::exit,
 };
@@ -123,10 +123,18 @@ impl StackItem {
         }
     }
 
-    /// Update the cached strings in a stack item.
+    /// Update the cached strings in the stack item.
     pub fn rerender(&mut self, config: &Config) {
         self.exact_str = self.expr.display(self.radix, config);
         self.approx_str = self.expr.clone().approx().display(self.radix, config);
+    }
+
+    /// Display the `StackItem` in its display mode using the (latex formatter)[latex::Formatter].
+    pub fn display_latex(&self, config: &Config) -> String {
+        match self.display_mode {
+            DisplayMode::Exact => self.expr.display_latex(self.radix, config),
+            DisplayMode::Approx => self.expr.clone().approx().display_latex(self.radix, config),
+        }
     }
 }
 

@@ -1,7 +1,4 @@
-use std::{
-    f64,
-    fmt::{self, Display, Formatter},
-};
+use std::f64;
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
@@ -50,9 +47,10 @@ pub enum Const {
     Mp,
 }
 
-impl Display for Const {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let s = match self {
+impl Const {
+    /// Pretty-print this constant using unicode characters.
+    pub fn display_unicode(self) -> &'static str {
+        match self {
             Self::Pi => "π",
             Self::Tau => "τ",
             Self::E => "e",
@@ -66,8 +64,26 @@ impl Display for Const {
             Self::G => "G",
             Self::Me => "mₑ",
             Self::Mp => "mₚ",
-        };
-        write!(f, "{}", s)
+        }
+    }
+
+    /// Pretty-print this constant using latex macros.
+    pub fn display_latex(self) -> &'static str {
+        match self {
+            Self::Pi => r"\pi",
+            Self::Tau => r"\tau",
+            Self::E => r"e",
+            Self::Gamma => r"\gamma",
+            Self::Vcs => r"\Delta v_{\mathrm{Cs}}",
+            Self::C => r"c",
+            Self::H => r"h",
+            Self::Qe => r"Q_e",
+            Self::K => r"k_B",
+            Self::Hbar => r"\hbar",
+            Self::G => r"G",
+            Self::Me => r"m_e",
+            Self::Mp => r"m_p",
+        }
     }
 }
 

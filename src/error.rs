@@ -51,6 +51,9 @@ pub enum SoftError {
     /// Eex input (input after the `e` in e-notation) was too large to raise an `f64` to the power of.
     BigEex,
 
+    /// An error occurred when interacting with the clipboard.
+    Clipboard,
+
     /// This error should never be thrown in a release. It's just used to debug certain things.
     #[cfg(debug_assertions)]
     Debug(String),
@@ -89,6 +92,7 @@ impl Display for SoftError {
             Self::BadSetPath(p) => write!(f, "E14: no such setting \"{}\"", strclamp(p, 18)),
             Self::BadSetVal(v) => write!(f, "E15: couldnt parse \"{}\"", strclamp(v, 18)),
             Self::BigEex => write!(f, "E16: eex too big"),
+            Self::Clipboard => write!(f, "E17: clipboard error"),
             #[cfg(debug_assertions)]
             Self::Debug(s) => write!(f, "DEBUG: {s}"),
         }

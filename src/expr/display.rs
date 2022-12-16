@@ -9,7 +9,7 @@ use std::{fmt, ops::Neg};
 use num::{traits::Inv, BigRational, One, Signed};
 
 /// Display `Expr`s in latex notation.
-// pub mod latex;
+pub mod latex;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 #[allow(missing_docs)]
@@ -150,7 +150,12 @@ where
     fn fmt_log(&mut self, base: &Expr<N>, arg: &Expr<N>) -> Result<(), Self::Error>;
     fn fmt_var(&mut self, var: &str) -> Result<(), Self::Error>;
     fn fmt_const(&mut self, cnst: Const) -> Result<(), Self::Error>;
-    fn fmt_mod(&mut self, lhs: &Expr<N>, rhs: &Expr<N>) -> Result<(), Self::Error>;
+    fn fmt_mod(&mut self, lhs: &Expr<N>, rhs: &Expr<N>) -> Result<(), Self::Error> {
+        self.fmt_child(Precedence::Product, lhs)?;
+        self.get_buf().write_char('%')?;
+        self.fmt_child(Precedence::Product, rhs)?;
+        Ok(())
+    }
 
     fn fmt_trig(
         &mut self,
@@ -200,7 +205,7 @@ where
     F: ExprFormatter<N>,
 {
     /// Format the given value to the given formatter.
-    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error>;
+    fn fmt_to(self, f: &mut F) -> Result<(), F::Error>;
 }
 
 #[allow(clippy::use_self)]
@@ -210,8 +215,8 @@ where
     Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
     F: ExprFormatter<N>,
 {
-    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
-        f.fmt(self)
+    fn fmt_to(self, f: &mut F) -> Result<(), F::Error> {
+        f.fmt(&self)
     }
 }
 
@@ -221,7 +226,7 @@ where
     Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
     F: ExprFormatter<N>,
 {
-    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+    fn fmt_to(self, f: &mut F) -> Result<(), F::Error> {
         f.fmt(self)
     }
 }
@@ -232,7 +237,7 @@ where
     Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
     F: ExprFormatter<N>,
 {
-    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+    fn fmt_to(self, f: &mut F) -> Result<(), F::Error> {
         f.get_buf().write_str(self).map_err(Into::into)
     }
 }
@@ -242,9 +247,9 @@ where
     N: Signed,
     Expr<N>: HasPosExp + Inv<Output = Expr<N>> + Clone + Signed,
     F: ExprFormatter<N>,
-    G: Fn(&mut F) -> Result<(), F::Error>,
+    G: FnOnce(&mut F) -> Result<(), F::Error>,
 {
-    fn fmt_to(&self, f: &mut F) -> Result<(), F::Error> {
+    fn fmt_to(self, f: &mut F) -> Result<(), F::Error> {
         self(f)
     }
 }
@@ -349,7 +354,7 @@ where
     }
 
     fn fmt_const(&mut self, cnst: Const) -> Result<(), Self::Error> {
-        write!(self.buf, "{cnst}")
+        self.buf.write_str(cnst.display_unicode())
     }
 
     fn fmt_mod(&mut self, lhs: &Expr<N>, rhs: &Expr<N>) -> Result<(), Self::Error> {
@@ -365,8 +370,7 @@ where
         arg: &Expr<N>,
         units: AngleMeasure,
     ) -> Result<(), Self::Error> {
-        func.fmt_to(self)?;
-        self.fmt_in_parens(|this: &mut Self| {
+        self.fmt_fn_call(func, |this: &mut Self| {
             this.fmt(arg)?;
             write!(this.get_buf(), " {units}")?;
             Ok(())
@@ -382,8 +386,7 @@ where
         units: AngleMeasure,
     ) -> Result<(), Self::Error> {
         self.fmt_in_parens(|this: &mut Self| {
-            func.fmt_to(this)?;
-            this.fmt_in_parens(arg)?;
+            this.fmt_fn_call(func, arg)?;
             write!(this.get_buf(), " {units}")?;
             Ok(())
         })?;
@@ -468,6 +471,26 @@ impl<N> Expr<N> {
     {
         let mut s = String::new();
         let mut formatter = DefaultFormatter::new(config, radix, &mut s);
+        formatter.fmt(self).unwrap();
+        s
+    }
+
+    /// Displays the given expression in the given radix with the given configuration using the
+    /// [latex formatter](latex::Formatter)
+    ///
+    /// # Panics
+    ///
+    /// This function could theoretically panic if `<String as fmt::Write>::write_str` panics. As
+    /// of the 1.65.0 standard library, this is strictly impossible.
+    pub fn display_latex(&self, radix: Radix, config: &Config) -> String
+    where
+        N: Signed,
+        Self: HasPosExp + Inv<Output = Self> + Clone + Signed,
+        for<'a> latex::Formatter<'a>: ExprFormatter<N>,
+        for<'a> <latex::Formatter<'a> as ExprFormatter<N>>::Error: fmt::Debug,
+    {
+        let mut s = String::new();
+        let mut formatter = latex::Formatter::new(config, radix, &mut s);
         formatter.fmt(self).unwrap();
         s
     }

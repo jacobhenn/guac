@@ -46,7 +46,7 @@ impl<'a> State<'a> {
             None => (),
         }
 
-        self.input = String::new();
+        self.input.clear();
 
         Ok(())
     }
