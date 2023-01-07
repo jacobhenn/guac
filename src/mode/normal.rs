@@ -67,7 +67,7 @@ impl<'a> State<'a> {
             KeyCode::Tab => {
                 self.dup();
             }
-            KeyCode::Char('d') => {
+            KeyCode::Char('d') if modifiers.is_empty() => {
                 self.drop();
             }
             KeyCode::Backspace => match &mut self.select_idx {
