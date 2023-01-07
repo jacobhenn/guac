@@ -9,7 +9,7 @@ use std::ops::Neg;
 
 use arboard::Clipboard;
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use num::{
     traits::{Inv, Pow},
@@ -30,7 +30,7 @@ impl<'a> State<'a> {
     /// Process a keypress in normal mode.
     pub fn normal_mode(
         &mut self,
-        KeyEvent { code, .. }: KeyEvent,
+        KeyEvent { code, modifiers }: KeyEvent,
         escape_digits: bool,
     ) -> Result<Status, SoftError> {
         let radix = self.input_radix.unwrap_or(self.config.radix);
@@ -222,6 +222,13 @@ impl<'a> State<'a> {
             KeyCode::Char('#') => {
                 self.radix_input.get_or_insert(String::new());
                 self.mode = Mode::Radix;
+            }
+            KeyCode::Char('u') if modifiers.contains(KeyModifiers::CONTROL) => {
+                let up_to = self.select_idx.unwrap_or(self.stack.len());
+                self.stack.drain(0..up_to);
+                if let Some(select_idx) = &mut self.select_idx {
+                    *select_idx -= up_to;
+                }
             }
             KeyCode::Char('u') => return Ok(Status::Undo),
             KeyCode::Char('U') => return Ok(Status::Redo),
