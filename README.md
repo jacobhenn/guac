@@ -75,6 +75,7 @@ if you won't be developing `guac`, run `cargo clean` after installing to save di
 - `<`: move selected expression to the left (by analogy to Vim's `<<`)
 - `right`: swap the selected expression with the expression to its left
 - `a`: cancel selection and jump to input (by analogy to Vim's `A`)
+- `ctrl-u`: delete all stack elements to the left of the selection (by convention)
 - `:`: enter command mode (by analogy to Vim's `:`) (see the [wiki](https://github.com/jacobhenn/guac/wiki/commands))
 - `|`: enter **pipe** mode
     - any char: type a command (to be executed directly, **not** through your `$SHELL`)
