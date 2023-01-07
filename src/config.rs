@@ -7,14 +7,22 @@ use crate::{
     radix::Radix,
 };
 
-use std::{str::FromStr, ops::Mul};
+use std::{fs, ops::Mul, str::FromStr};
+
+use anyhow::{bail, Context, Result};
 
 use derive_more::Display;
+
+use serde::Deserialize;
+
+use serde_with::DeserializeFromStr;
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 
 /// The configuration stored in `State` which will be read from a config file in the future.
+#[derive(Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// The angle measure that will be used for trig operations.
     pub angle_measure: AngleMeasure,
@@ -36,7 +44,30 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+impl Config {
+    /// Attempt to read the configuration file from the system according to [`dirs::config_dir`].
+    /// On *nix, this will look in `~/.config/guac/config.toml`. Return `Ok(None)` if the config
+    // file is not present.
+    pub fn get() -> Result<Option<Self>> {
+        let Some(mut config_path) = dirs::config_dir() else { return Ok(None); };
+
+        config_path.push("guac");
+        config_path.push("config.toml");
+
+        if !config_path.is_file() {
+            return Ok(None);
+        }
+
+        let config_str =
+            fs::read_to_string(config_path).context("config file exists, but could not be read")?;
+
+        toml::from_str(&config_str)
+            .context("config file could not be parsed")
+            .map(Some)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, DeserializeFromStr)]
 #[cfg_attr(test, derive(Arbitrary))]
 /// A unit of angle
 pub enum AngleMeasure {
@@ -124,7 +155,7 @@ impl AngleMeasure {
 }
 
 impl FromStr for AngleMeasure {
-    type Err = ();
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -138,7 +169,7 @@ impl FromStr for AngleMeasure {
             "hour" => Ok(Self::HourAngle),
             "point" => Ok(Self::Point),
             "mil" => Ok(Self::NatoMil),
-            _ => Err(()),
+            other => bail!("inavlid angle measure '{other}'"),
         }
     }
 }

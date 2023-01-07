@@ -703,7 +703,7 @@ fn guac_interactive(force: bool) -> Result<(), Error> {
         }
     }
 
-    let config = Config::default();
+    let config = Config::get()?.unwrap_or_default();
     let mut state = State::new(stdout, config);
 
     state.init_from_stdin();

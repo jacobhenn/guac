@@ -4,6 +4,8 @@ use std::{fmt::Display, num::NonZeroUsize, str::FromStr};
 
 use num::{bigint::Sign, BigInt, BigRational, One, Signed};
 
+use serde_with::DeserializeFromStr;
+
 #[cfg(test)]
 use proptest::prelude::Strategy;
 
@@ -29,7 +31,7 @@ pub const DIGITS: [char; 64] = [
 ];
 
 /// A radix. This will always contain something within the range 2..=64.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, DeserializeFromStr)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Radix(
     #[cfg_attr(
