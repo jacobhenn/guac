@@ -1,7 +1,7 @@
 use crate::{
     expr::{constant::Const, Expr},
     radix::{self, Radix},
-    error::SoftError, State, DisplayMode,
+    message::{SoftError, Message}, State, DisplayMode,
 };
 
 use std::fmt::Display;
@@ -119,9 +119,9 @@ impl<'a> State<'a> {
 
         let line = format!(
             "{} {} {} {} {}",
-            self.err
+            self.message
                 .as_ref()
-                .map(ToString::to_string)
+                .map(Message::to_string)
                 .unwrap_or_default(),
             "(q: quit)",
             self.config.angle_measure,
@@ -135,11 +135,10 @@ impl<'a> State<'a> {
 
         let colored_line = format!(
             "{} {} {} {} {}",
-            self.err
+            self.message
                 .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default()
-                .red(),
+                .map(Message::to_colored_string)
+                .unwrap_or_default(),
             "(q: quit)",
             self.config.angle_measure,
             self.config.radix,

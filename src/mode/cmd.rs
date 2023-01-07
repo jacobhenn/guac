@@ -1,4 +1,4 @@
-use crate::{State, mode::Status, error::SoftError};
+use crate::{State, mode::Status, message::SoftError};
 
 use crossterm::event::{KeyCode, KeyEvent};
 

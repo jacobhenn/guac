@@ -48,7 +48,7 @@ impl<'a> State<'a> {
                 if !status.success() {
                     let stderr = BufReader::new(stderr);
                     return Ok(Err(SoftError::SysCmdFailed(
-                        word.to_string(),
+                        word.to_owned(),
                         stderr
                             .lines()
                             .next()

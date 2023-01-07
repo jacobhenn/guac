@@ -1,6 +1,6 @@
 use crate::{
-    error::SoftError,
     expr::{constant::Const, Expr},
+    message::{Message, SoftError},
     mode::{Mode, Status},
     DisplayMode, State,
 };
@@ -187,7 +187,7 @@ impl<'a> State<'a> {
             KeyCode::Char('[') => self.toggle_debug(),
             #[cfg(debug_assertions)]
             KeyCode::Char(']') => {
-                unimplemented!("`]` is a debug key which is currently not being used");
+                self.message = Some(Message::Debug(String::from("debug test :3")));
             }
             KeyCode::Char('x') => {
                 self.push_expr(
@@ -206,14 +206,14 @@ impl<'a> State<'a> {
             KeyCode::Char('|') => {
                 self.push_input()?;
                 if !self.stack.is_empty() {
-                    self.err = None;
+                    self.message = None;
                     self.input.clear();
                     self.mode = Mode::Pipe;
                 }
             }
             KeyCode::Char(':') => {
                 self.push_input()?;
-                self.err = None;
+                self.message = None;
                 self.input.clear();
                 self.mode = Mode::Cmd;
             }

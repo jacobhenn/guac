@@ -14,8 +14,8 @@
 use crate::{
     args::{Args, SubCommand},
     config::Config,
-    error::SoftError,
     expr::Expr,
+    message::{Message, SoftError},
     mode::{Mode, Status},
     radix::Radix,
 };
@@ -24,6 +24,7 @@ use std::{
     fmt::{Display, Write},
     io::{self, BufRead, BufReader, StdoutLock, Write as _},
     mem,
+    ops::ControlFlow,
     process::exit,
 };
 
@@ -56,8 +57,8 @@ pub mod cmd;
 /// Types and functions for parsing and displaying radices.
 pub mod radix;
 
-/// [`SoftError`], [`SoftResult`], and their `impl`s.
-pub mod error;
+/// Messages to the user which are displayed on the modeline.
+pub mod message;
 
 mod args;
 
@@ -176,8 +177,8 @@ pub struct State<'a> {
     /// The current local radix in the input field. If `self.radix_input` is empty or invalid, this should be `None`.
     input_radix: Option<Radix>,
 
-    /// The soft error currently displaying on the modeline.
-    err: Option<SoftError>,
+    /// The message currently displaying on the modeline.
+    message: Option<Message>,
 
     mode: Mode,
 
@@ -199,7 +200,7 @@ impl<'a> State<'a> {
             eex_input: None,
             radix_input: None,
             input_radix: None,
-            err: None,
+            message: None,
             mode: Mode::Normal,
             select_idx: None,
             config,
@@ -591,75 +592,63 @@ impl<'a> State<'a> {
         }
 
         if !bad_idxs.is_empty() {
-            eprintln!(
-                "{}{} couldn't parse stdin (line{} {})",
-                "info".bold().cyan(),
-                ":".bold(),
-                if bad_idxs.len() == 1 { "" } else { "s" },
-                bad_idxs
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
+            self.message = Some(Message::Error(SoftError::StdinParse(bad_idxs)));
         }
     }
 
-    fn ev_loop(&mut self) -> Result<(), Error> {
-        loop {
-            self.err = None;
+    fn tick(&mut self) -> Result<ControlFlow<()>, Error> {
+        self.message = None;
 
-            // Read the next event from the terminal.
-            if let Event::Key(kev) = event::read().context("couldn't get next terminal event")? {
-                match self.handle_keypress(kev) {
-                    Ok(Status::Render) => {
-                        self.write_modeline().context("couldn't write modeline")?;
-                        self.render().context("couldn't render the state")?;
-                        if let Some(old_stack) = self.history.last() {
-                            if &self.stack != old_stack {
-                                self.future = Vec::new();
-                                self.history.push(self.stack.clone());
-                            }
-                        } else {
-                            self.future = Vec::new();
-                            self.history.push(self.stack.clone());
-                        }
-                    }
-                    Ok(Status::Exit) => {
-                        break;
-                    }
-                    Ok(Status::Undo) => {
-                        if self.future.is_empty() {
-                            self.history.pop();
-                        }
+        let Event::Key(kev) = event::read().context("couldn't get next terminal event")?
+        else { return Ok(ControlFlow::Continue(())); };
 
-                        if let Some(mut old_stack) = self.history.pop() {
-                            mem::swap(&mut old_stack, &mut self.stack);
-                            self.future.push(old_stack);
-                        }
-
-                        self.render().context("couldn't render the state")?;
+        match self.handle_keypress(kev) {
+            Ok(Status::Render) => {
+                self.write_modeline().context("couldn't write modeline")?;
+                self.render().context("couldn't render the state")?;
+                if let Some(old_stack) = self.history.last() {
+                    if &self.stack != old_stack {
+                        self.future = Vec::new();
+                        self.history.push(self.stack.clone());
                     }
-                    Ok(Status::Redo) => {
-                        if let Some(mut new_stack) = self.future.pop() {
-                            mem::swap(&mut new_stack, &mut self.stack);
-                            self.history.push(new_stack);
-                        }
-                        self.render().context("couldn't render the state")?;
-                    }
-                    #[cfg(debug_assertions)]
-                    Ok(Status::Debug) => bail!("debug"),
-                    Err(e) => {
-                        self.err = Some(e);
-                        // TODO: decide if we really need to render the whole stack here
-                        self.write_modeline().context("couldn't write modeline")?;
-                        self.render().context("couldn't render the state")?;
-                    }
+                } else {
+                    self.future = Vec::new();
+                    self.history.push(self.stack.clone());
                 }
+            }
+            Ok(Status::Exit) => {
+                return Ok(ControlFlow::Break(()));
+            }
+            Ok(Status::Undo) => {
+                if self.future.is_empty() {
+                    self.history.pop();
+                }
+
+                if let Some(mut old_stack) = self.history.pop() {
+                    mem::swap(&mut old_stack, &mut self.stack);
+                    self.future.push(old_stack);
+                }
+
+                self.render().context("couldn't render the state")?;
+            }
+            Ok(Status::Redo) => {
+                if let Some(mut new_stack) = self.future.pop() {
+                    mem::swap(&mut new_stack, &mut self.stack);
+                    self.history.push(new_stack);
+                }
+                self.render().context("couldn't render the state")?;
+            }
+            #[cfg(debug_assertions)]
+            Ok(Status::Debug) => bail!("debug"),
+            Err(e) => {
+                self.message = Some(Message::Error(e));
+                // TODO: decide if we really need to render the whole stack here
+                self.write_modeline().context("couldn't write modeline")?;
+                self.render().context("couldn't render the state")?;
             }
         }
 
-        Ok(())
+        Ok(ControlFlow::Continue(()))
     }
 
     fn start(&mut self) -> Result<(), Error> {
@@ -679,7 +668,7 @@ impl<'a> State<'a> {
         self.write_modeline().context("couldn't write modeline")?;
         self.render().context("couldn't render the state")?;
 
-        self.ev_loop()?;
+        while self.tick()?.is_continue() {}
 
         Ok(())
     }
