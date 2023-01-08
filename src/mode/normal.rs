@@ -151,15 +151,15 @@ impl<'a> State<'a> {
             }
             KeyCode::Char('~') => self.apply_unary(&Neg::neg, &const_none1)?,
             KeyCode::Char('\\') => self.apply_unary(&|x| x.abs(), &const_none1)?,
-            KeyCode::Char('s') => {
+            KeyCode::Char('s') if modifiers.is_empty() => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(&|x| x.generic_sin(angle_measure), &const_none1)?;
             }
-            KeyCode::Char('c') => {
+            KeyCode::Char('c') if modifiers.is_empty() => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(&|x| x.generic_cos(angle_measure), &const_none1)?;
             }
-            KeyCode::Char('t') => {
+            KeyCode::Char('t') if modifiers.is_empty() => {
                 let angle_measure = self.config.angle_measure;
                 self.apply_unary(&|x| x.generic_tan(angle_measure), &|x| {
                     (x.clone().into_turns(angle_measure) % Expr::from((1, 2)) == Expr::from((1, 4)))

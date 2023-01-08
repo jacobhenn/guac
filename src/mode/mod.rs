@@ -1,7 +1,8 @@
 use crate::{
     expr::{constant::Const, Expr},
+    message::{Message, SoftError},
     radix::{self, Radix},
-    message::{SoftError, Message}, State, DisplayMode,
+    DisplayMode, State,
 };
 
 use std::fmt::Display;
@@ -111,8 +112,8 @@ impl<'a> State<'a> {
         }
     }
 
-    /// Write the given mode name on the modeline.
-    pub fn write_modeline(&mut self) -> Result<()> {
+    /// Render the current modeline.
+    pub fn render_modeline(&mut self) -> Result<()> {
         let (width, height) = terminal::size().context("couldn't get terminal size")?;
 
         let (cx, cy) = cursor::position().context("couldn't get cursor pos")?;

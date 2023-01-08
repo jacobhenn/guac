@@ -28,7 +28,7 @@ use std::{
     process::exit,
 };
 
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, Context, Result};
 
 use colored::Colorize;
 
@@ -226,7 +226,7 @@ impl<'a> State<'a> {
         self.input_radix.unwrap_or(self.config.radix)
     }
 
-    fn render(&mut self) -> Result<(), Error> {
+    fn render(&mut self) -> Result<()> {
         let (_, cy) = cursor::position().context("couldn't get cursor pos")?;
         self.stdout
             .queue(terminal::Clear(ClearType::CurrentLine))
@@ -331,6 +331,13 @@ impl<'a> State<'a> {
 
         self.stdout.flush().context("couldn't flush stdout")?;
 
+        Ok(())
+    }
+
+    fn render_all(&mut self) -> Result<()> {
+        self.render().context("couldn't render the stack")?;
+        self.render_modeline()
+            .context("couldn't render the modeline")?;
         Ok(())
     }
 
@@ -596,16 +603,10 @@ impl<'a> State<'a> {
         }
     }
 
-    fn tick(&mut self) -> Result<ControlFlow<()>, Error> {
-        self.message = None;
-
-        let Event::Key(kev) = event::read().context("couldn't get next terminal event")?
-        else { return Ok(ControlFlow::Continue(())); };
-
-        match self.handle_keypress(kev) {
-            Ok(Status::Render) => {
-                self.write_modeline().context("couldn't write modeline")?;
-                self.render().context("couldn't render the state")?;
+    fn handle_status(&mut self, status: Status) -> Result<ControlFlow<()>> {
+        match status {
+            Status::Render => {
+                self.render_all()?;
                 if let Some(old_stack) = self.history.last() {
                     if &self.stack != old_stack {
                         self.future = Vec::new();
@@ -616,10 +617,10 @@ impl<'a> State<'a> {
                     self.history.push(self.stack.clone());
                 }
             }
-            Ok(Status::Exit) => {
+            Status::Exit => {
                 return Ok(ControlFlow::Break(()));
             }
-            Ok(Status::Undo) => {
+            Status::Undo => {
                 if self.future.is_empty() {
                     self.history.pop();
                 }
@@ -631,7 +632,7 @@ impl<'a> State<'a> {
 
                 self.render().context("couldn't render the state")?;
             }
-            Ok(Status::Redo) => {
+            Status::Redo => {
                 if let Some(mut new_stack) = self.future.pop() {
                     mem::swap(&mut new_stack, &mut self.stack);
                     self.history.push(new_stack);
@@ -639,19 +640,37 @@ impl<'a> State<'a> {
                 self.render().context("couldn't render the state")?;
             }
             #[cfg(debug_assertions)]
-            Ok(Status::Debug) => bail!("debug"),
-            Err(e) => {
-                self.message = Some(Message::Error(e));
-                // TODO: decide if we really need to render the whole stack here
-                self.write_modeline().context("couldn't write modeline")?;
-                self.render().context("couldn't render the state")?;
-            }
+            Status::Debug => bail!("debug"),
         }
 
         Ok(ControlFlow::Continue(()))
     }
 
-    fn start(&mut self) -> Result<(), Error> {
+    fn handle_next_event(&mut self) -> Result<ControlFlow<()>> {
+        self.message = None;
+
+        // let Event::Key(kev) = event::read().context("couldn't get next terminal event")?
+        // else { return Ok(ControlFlow::Continue(())); };
+
+        match event::read().context("couldn't get next terminal event")? {
+            Event::Key(kev) => match self.handle_keypress(kev) {
+                Ok(status) => {
+                    return self.handle_status(status);
+                }
+                Err(e) => {
+                    self.message = Some(Message::Error(e));
+                    // TODO: decide if we really need to render the whole stack here
+                    self.render_all()?;
+                }
+            },
+            Event::Resize(_, _) => self.render_all().context("couldn't render the state")?,
+            Event::Mouse(_) => return Ok(ControlFlow::Continue(())),
+        }
+
+        Ok(ControlFlow::Continue(()))
+    }
+
+    fn start(&mut self) -> Result<()> {
         terminal::enable_raw_mode().context("couldn't enable raw mode")?;
 
         let (cx, cy) = cursor::position().context("couldn't get cursor position")?;
@@ -665,10 +684,9 @@ impl<'a> State<'a> {
                 .context("couldn't move cursor")?;
         }
 
-        self.write_modeline().context("couldn't write modeline")?;
-        self.render().context("couldn't render the state")?;
+        self.render_all()?;
 
-        while self.tick()?.is_continue() {}
+        while self.handle_next_event()?.is_continue() {}
 
         Ok(())
     }
@@ -691,7 +709,7 @@ fn cleanup() {
     }
 }
 
-fn guac_interactive(force: bool) -> Result<(), Error> {
+fn guac_interactive(force: bool) -> Result<()> {
     let stdout = io::stdout();
     let stdout = stdout.lock();
 
@@ -713,7 +731,7 @@ fn guac_interactive(force: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn go() -> Result<(), Error> {
+fn go() -> Result<()> {
     let args: Args = argh::from_env();
 
     match args.subc {

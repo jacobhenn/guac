@@ -30,7 +30,7 @@ pub struct Config {
     /// The "default" radix in which numbers will be inputted or displayed.
     pub radix: Radix,
 
-    /// The number of digits to display after the decimal point of approximate numbers.
+    /// The number of digits to display after the radix point of approximate numbers.
     pub precision: usize,
 }
 
