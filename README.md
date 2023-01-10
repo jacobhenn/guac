@@ -2,11 +2,8 @@
 
 `guac` is a minimal but powerful interactive [stack-based](https://en.wikipedia.org/wiki/Reverse_Polish_notation) calculator which displays on just a few lines of the terminal.
 
-```
-$ guac
-x sqrt(π)/5 hex#ef2 78█
-                            (q: quit) dec rad
-```
+demo (asciinema):
+[![asciicast](https://asciinema.org/a/T6CAIqcv5vQayg274QyKYpEMY.png)](https://asciinema.org/a/T6CAIqcv5vQayg274QyKYpEMY)
 
 ## selling points
 
