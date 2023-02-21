@@ -107,7 +107,7 @@ impl Expr<BigRational> {
             Self::Sum(ts) => ts.into_iter().map(Self::approx).sum(),
             Self::Product(fs) => fs.into_iter().map(Self::approx).product(),
             Self::Power(b, e) => Self::map_approx_binary(*b, *e, f64::powf, Expr::<f64>::pow),
-            Self::Log(b, a) => Self::map_approx_binary(*b, *a, f64::log, Expr::<f64>::log),
+            Self::Log(b, a) => Self::map_approx_binary(*a, *b, f64::log, Expr::<f64>::log),
             Self::Mod(n, d) => Self::map_approx_binary(*n, *d, |n, d| n % d, |n, d| n % d),
             Self::Sin(x, m) => Self::map_approx_unary(
                 *x,
